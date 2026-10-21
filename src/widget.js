@@ -5,7 +5,7 @@ let S = null, OS = 'windows';
 const $ = (id) => document.getElementById(id);
 const stage = $('stage'), box = $('box'), elTitle = $('title'), elLabel = $('label'), elTime = $('time'), elBar = $('bar'), elFill = $('fill');
 const T = { state: 'idle', idx: 0, endAt: 0, remain: 0, total: 0, toast: '', toastUntil: 0 };
-let segKey = null, fontLoaded = '', maxBox = 0, lastText = null, lastLabel = null, lastWarn = null, lastSec = -1, lastPct = -1, flashT = 0;
+let segKey = null, fontLoaded = '', maxBox = 0, lastText = null, lastLabel = null, lastWarn = null, lastSec = -1, lastPct = -1, flashT = 0, wasToasting = false;
 const now = () => performance.now();
 // 放映联动命中某个文件、且给它设了专属方案时,用专属方案;否则用默认环节
 let profile = null;
@@ -162,6 +162,9 @@ function render(force) {
   let lab = '';
   if (toasting) lab = T.toast;
   else if (S.showLabel) { const nm = list[T.idx].name || ''; lab = list.length > 1 ? `${nm ? nm + ' ' : ''}(${T.idx + 1}/${list.length})` : nm; }
+  // 提示结束后放开被提示撑宽的宽度,恢复原始大小
+  if (wasToasting && !toasting) { maxBox = 0; box.style.minWidth = ''; }
+  wasToasting = toasting;
   if (lab !== lastLabel || force) { elLabel.textContent = lab; elLabel.style.display = lab ? '' : 'none'; lastLabel = lab; }
   const warn = S.warnEnabled && (fin || ((T.state === 'running' || T.state === 'paused') && rem <= Math.min(S.warnSec * 1000, T.total / 2)));
   if (warn !== lastWarn) { lastWarn = warn; styleText(warn); }
@@ -232,7 +235,7 @@ api.on('link', (p) => {
   if (!S) return;
   // 切换到该文件专属的计时方案(没有就用默认)
   profile = a && file && S.fileProfiles && S.fileProfiles[file] ? S.fileProfiles[file] : null;
-  if (a && file) toast('联动: ' + file.split(/[\\/]/).pop());
+  if (a && file && S.showTitle) toast('联动: ' + file.split(/[\\/]/).pop());
   apply();
   if (!S.linkAutoStart) return;
   if (a) { goFirst(); start(); } else { goFirst(); }

@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "悬浮倒计时",
   "mainBinaryName": "float-countdown",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "identifier": "com.dario.floatcountdown",
   "build": {
     "frontendDist": "../src"
