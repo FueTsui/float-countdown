@@ -60,6 +60,7 @@ function fillFonts() {
   if (S && S.fontFamily && !list.includes(S.fontFamily)) list.push(S.fontFamily);
   sel.innerHTML = '<option value="">系统默认</option>' + list.map((f) => `<option value="${f}" style="font-family:'${f}'">${f}</option>`).join('');
   if (S) sel.value = S.fontFamily || '';
+  if (sel._dd) sel._dd.rebuild();
 }
 
 // ---------- 侧栏折叠 ----------
@@ -224,6 +225,7 @@ function refresh() {
     }
     fmtOut(el); sliderFill(el);
   }
+  for (const sel of $$('select')) if (sel._dd) sel._dd.sync();
   for (const el of $$('[data-hk]')) el.value = S.hotkeys[el.dataset.hk] || '';
   if (document.activeElement !== $('#segText')) $('#segText').value = window.CDParse.segmentsToText(S.segments);
   const typing = (box) => document.activeElement && document.activeElement.tagName === 'INPUT' && box.contains(document.activeElement);
@@ -424,6 +426,93 @@ for (const row of $$('.row')) {
   if (!title) continue;
   for (const el of $$('input, select', row)) if (!el.getAttribute('aria-label')) el.setAttribute('aria-label', title.textContent.trim());
 }
+
+// ---------- 下拉框:用自绘的 Fluent / macOS 风格列表替换系统自带的弹出菜单 ----------
+// 原 <select> 仍是数据源(保留 data-k 绑定),这里只负责显示和选择
+let openDd = null;
+function closeDd() { if (openDd) { openDd.close(); openDd = null; } }
+function enhanceSelect(sel) {
+  const wrap = document.createElement('div');
+  wrap.className = 'dd ' + sel.className;
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'dd-btn';
+  btn.setAttribute('aria-haspopup', 'listbox'); btn.setAttribute('aria-expanded', 'false');
+  btn.setAttribute('aria-label', sel.getAttribute('aria-label') || '');
+  const label = document.createElement('span');
+  btn.appendChild(label);
+  const list = document.createElement('ul');
+  list.className = 'dd-list'; list.setAttribute('role', 'listbox'); list.hidden = true;
+  wrap.append(btn, list);
+  sel.hidden = true;
+  sel.after(wrap);
+
+  let items = [], cur = -1;
+  const sync = () => {
+    const o = sel.selectedOptions[0];
+    label.textContent = o ? o.textContent : '';
+    label.style.fontFamily = o && o.style.fontFamily ? o.style.fontFamily : '';
+    items.forEach((li, i) => { const on = sel.options[i] === o; li.classList.toggle('sel', on); li.setAttribute('aria-selected', String(on)); });
+  };
+  const rebuild = () => {
+    list.innerHTML = '';
+    items = [...sel.options].map((o) => {
+      const li = document.createElement('li');
+      li.setAttribute('role', 'option'); li.textContent = o.textContent; li.style.fontFamily = o.style.fontFamily;
+      li.onmousedown = (e) => e.preventDefault();
+      li.onclick = () => { choose(items.indexOf(li)); };
+      list.appendChild(li);
+      return li;
+    });
+    sync();
+  };
+  const hl = (i) => {
+    cur = Math.max(0, Math.min(items.length - 1, i));
+    items.forEach((li, j) => li.classList.toggle('hl', j === cur));
+    items[cur] && items[cur].scrollIntoView({ block: 'nearest' });
+  };
+  const place = () => {
+    const r = btn.getBoundingClientRect();
+    const below = innerHeight - r.bottom - 8, above = r.top - 8;
+    const h = Math.min(list.scrollHeight + 8, 320);
+    const up = below < h && above > below;
+    list.style.minWidth = r.width + 'px';
+    list.style.left = Math.max(8, Math.min(r.left, innerWidth - list.offsetWidth - 8)) + 'px';
+    list.style.maxHeight = Math.max(120, Math.min(320, up ? above : below)) + 'px';
+    list.style.top = up ? '' : r.bottom + 4 + 'px';
+    list.style.bottom = up ? innerHeight - r.top + 4 + 'px' : '';
+  };
+  const open = () => {
+    if (openDd && openDd.sel !== sel) closeDd();
+    list.hidden = false; btn.setAttribute('aria-expanded', 'true');
+    place();
+    hl(Math.max(0, sel.selectedIndex));
+    openDd = { sel, close };
+  };
+  function close() { list.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
+  function choose(i) {
+    close(); openDd = null; btn.focus();
+    if (i < 0 || sel.selectedIndex === i) return;
+    sel.selectedIndex = i; sync();
+    sel.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  btn.onclick = () => { if (list.hidden) open(); else { close(); openDd = null; } };
+  btn.onkeydown = (e) => {
+    const isOpen = !list.hidden;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!isOpen) open(); else hl(cur + (e.key === 'ArrowDown' ? 1 : -1));
+    } else if (isOpen && (e.key === 'Home' || e.key === 'End')) { e.preventDefault(); hl(e.key === 'Home' ? 0 : items.length - 1); }
+    else if (isOpen && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); choose(cur); }
+    else if (isOpen && (e.key === 'Escape' || e.key === 'Tab')) { if (e.key === 'Escape') e.preventDefault(); close(); openDd = null; }
+  };
+  sel._dd = { sync, rebuild };
+  rebuild();
+}
+document.addEventListener('mousedown', (e) => { if (openDd && !e.target.closest('.dd')) closeDd(); });
+window.addEventListener('blur', closeDd);
+window.addEventListener('resize', closeDd);
+$('#pages').addEventListener('scroll', closeDd);
+for (const sel of $$('select')) enhanceSelect(sel);
 
 // ---------- 启动 ----------
 let lastFiles = '';

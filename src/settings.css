@@ -198,7 +198,7 @@ h2 .btn { margin-left: auto; }
 .chips button.on { background: var(--accent); color: var(--accent-fg); }
 
 /* ---------------- 输入框 ---------------- */
-input[type=text], input[type=number], textarea, select {
+input[type=text], input[type=number], textarea, select, .dd-btn {
   font: inherit; color: var(--fg); min-height: 32px; padding: 5px 11px 6px;
   background: var(--ctl); border: 1px solid var(--ctl-border); border-bottom-color: var(--ctl-border-bottom, var(--ctl-border));
   border-radius: var(--radius-ctl); outline: none; user-select: text; -webkit-user-select: text;
@@ -210,7 +210,7 @@ html[data-os="windows"] :is(input[type=text], input[type=number], textarea):focu
 html[data-os="linux"] :is(input[type=text], input[type=number], textarea):focus {
   background: var(--card); border-bottom: 2px solid var(--accent); padding-bottom: 5px;
 }
-select {
+select, .dd-btn {
   appearance: none; -webkit-appearance: none; padding-right: 34px; min-width: 140px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%23888' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 11px center;
@@ -335,7 +335,7 @@ html[data-os="macos"] :is(input[type=text], input[type=number], textarea) {
 }
 html[data-os="macos"] :is(input[type=text], input[type=number], textarea):focus { box-shadow: 0 0 0 3.5px color-mix(in srgb, var(--accent) 45%, transparent), 0 0 0 .5px var(--accent); }
 html[data-os="macos"] input[type=number] { width: 70px; }
-html[data-os="macos"] select {
+html[data-os="macos"] :is(select, .dd-btn) {
   min-height: 22px; padding: 2px 26px 2px 9px; border-radius: 6px; border: none; min-width: 120px;
   background-color: var(--ctl); box-shadow: 0 0 0 .5px rgba(0,0,0,.15), 0 .5px 1.5px rgba(0,0,0,.15);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%23007aff'/%3E%3Cpath d='M5 6.5 8 4l3 2.5M5 9.5 8 12l3-2.5' fill='none' stroke='%23fff' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -434,4 +434,37 @@ html[data-os="macos"] #sidebar { padding-top: 40px; }
 .hint-line { color: var(--fg2); font-size: 12px; margin: 6px 2px 0; }
 
 /* 键盘焦点:所有控件统一的焦点框 */
-button:focus-visible, select:focus-visible, input[type=color]:focus-visible, input[type=range]:focus-visible, #nav li:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:focus-visible, select:focus-visible, .dd-btn:focus-visible, input[type=color]:focus-visible, input[type=range]:focus-visible, #nav li:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------------- 自绘下拉框 ---------------- */
+select[hidden] { display: none; }
+.dd { position: relative; display: inline-block; }
+.dd-btn { display: block; width: 100%; text-align: left; cursor: default; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: none; -webkit-user-select: none; }
+.dd-btn:hover { background-color: var(--ctl-hover); }
+.dd-btn[aria-expanded="true"] { background-color: var(--card); }
+.dd-list {
+  position: fixed; z-index: 50; margin: 0; padding: 4px; list-style: none; overflow-y: auto; box-sizing: border-box;
+  color: var(--fg); background: var(--win-bg); border: 1px solid var(--card-border);
+  border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .18), 0 0 2px rgba(0, 0, 0, .2);
+  animation: ddIn .12s ease-out;
+}
+html[data-theme="dark"] .dd-list { background: #2c2c2c; border-color: rgba(255, 255, 255, .08); box-shadow: 0 8px 24px rgba(0, 0, 0, .5); }
+.dd-list li {
+  position: relative; padding: 0 12px; min-height: 36px; line-height: 36px; border-radius: 4px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; cursor: default;
+}
+.dd-list li + li { margin-top: 2px; }
+.dd-list li:hover, .dd-list li.hl { background: var(--subtle-hover); }
+.dd-list li.sel { background: var(--subtle-press); }
+.dd-list li.sel::before { content: ""; position: absolute; left: 0; top: 10px; width: 3px; height: 16px; border-radius: 2px; background: var(--accent); }
+.dd-list::-webkit-scrollbar { width: 8px; }
+.dd-list::-webkit-scrollbar-thumb { background: var(--ctl-strong); border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
+@keyframes ddIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+/* macOS:弹出菜单样式,选中项蓝底白字并带对勾 */
+html[data-os="macos"] .dd-list { padding: 5px; border-radius: 8px; background: color-mix(in srgb, var(--win-bg) 88%, transparent); backdrop-filter: blur(20px); box-shadow: 0 0 0 .5px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.25); }
+html[data-os="macos"] .dd-list li { min-height: 22px; line-height: 22px; padding: 0 8px 0 22px; border-radius: 4px; margin-top: 0; }
+html[data-os="macos"] .dd-list li:hover, html[data-os="macos"] .dd-list li.hl { background: var(--accent); color: var(--accent-fg, #fff); }
+html[data-os="macos"] .dd-list li.sel { background: transparent; }
+html[data-os="macos"] .dd-list li.sel:hover, html[data-os="macos"] .dd-list li.sel.hl { background: var(--accent); }
+html[data-os="macos"] .dd-list li.sel::before { content: "✓"; left: 6px; top: 0; width: auto; height: auto; background: none; border-radius: 0; font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { .dd-list { animation: none; } }
