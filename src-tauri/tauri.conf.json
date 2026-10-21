@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "悬浮倒计时",
+  "mainBinaryName": "float-countdown",
+  "version": "2.0.0",
+  "identifier": "com.dario.floatcountdown",
+  "build": {
+    "frontendDist": "../src"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "macOSPrivateApi": true,
+    "windows": [],
+    "security": {
+      "csp": null,
+      "assetProtocol": { "enable": true, "scope": ["**"] }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "dmg", "app"],
+    "category": "Productivity",
+    "shortDescription": "悬浮倒计时",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": { "languages": ["SimpChinese"], "installMode": "currentUser" }
+    },
+    "macOS": { "minimumSystemVersion": "11.0" }
+  }
+}

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>CDWidget</title>
+<style>
+  html, body { margin: 0; background: transparent; overflow: hidden; user-select: none; -webkit-user-select: none; cursor: default; }
+  /* #stage 的 24px 内边距留给阴影,需与 lib.rs 里的 PAD 一致 */
+  #stage { display: inline-block; padding: 24px; }
+  #box { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; transition: outline-color .15s; }
+  #box.drop { outline: 3px dashed #22d3ee; outline-offset: 4px; }
+  #title { white-space: nowrap; line-height: 1.25; font-weight: 600; margin-bottom: .15em; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  #label { white-space: nowrap; line-height: 1.2; opacity: .8; margin-bottom: .1em; }
+  #time { white-space: nowrap; line-height: 1.1; font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+  #bar { align-self: stretch; margin-top: .3em; border-radius: 99px; background: rgba(255,255,255,.18); overflow: hidden; }
+  #box.bar-top #bar { order: -1; margin-top: 0; margin-bottom: .35em; }
+  #fill { height: 100%; width: 100%; background: currentColor; border-radius: 99px; transition: width .05s linear; }
+  @keyframes fl { 0%, 100% { filter: none; transform: scale(1); } 50% { filter: brightness(1.9) saturate(1.4); transform: scale(1.04); } }
+  #box.flash { animation: fl .5s ease-in-out 10; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="box">
+    <div id="title"></div>
+    <div id="label"></div>
+    <div id="time">00:00</div>
+    <div id="bar"><div id="fill"></div></div>
+  </div>
+</div>
+<script src="parse.js"></script>
+<script src="common.js"></script>
+<script src="widget.js"></script>
+</body>
+</html>

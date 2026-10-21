@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>悬浮倒计时 设置</title>
+<link rel="stylesheet" href="settings.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 2M9.5 3h5M12 3v3"/></symbol>
+  <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.8 1.8-1.7 0-1.3-1-1.6-1-2.6 0-.9.7-1.6 1.7-1.6H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="14.5" cy="7" r="1"/></symbol>
+  <symbol id="i-title" viewBox="0 0 24 24"><path d="M5 6h14M12 6v12M4 20h16" /><rect x="4" y="15.5" width="10" height="1.5" rx=".75"/></symbol>
+  <symbol id="i-slides" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8M10 8.5l4 1.75L10 12z"/></symbol>
+  <symbol id="i-window" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15h2M11 15h2M15 15h2M7 11h10"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z"/></symbol>
+  <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4h4"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></symbol>
+</svg>
+
+<div id="app">
+  <nav id="sidebar">
+    <div class="brand" data-tauri-drag-region>
+      <img src="icon.png" alt="" width="28" height="28">
+      <div><div class="brand-name">悬浮倒计时</div><div class="brand-sub" id="brandSub">设置</div></div>
+    </div>
+    <ul id="nav">
+      <li data-page="timer" class="on"><svg><use href="#i-timer"/></svg><span>计时环节</span></li>
+      <li data-page="look"><svg><use href="#i-palette"/></svg><span>外观</span></li>
+      <li data-page="title"><svg><use href="#i-title"/></svg><span>标题与进度条</span></li>
+      <li data-page="slides"><svg><use href="#i-slides"/></svg><span>演示文件</span></li>
+      <li data-page="window"><svg><use href="#i-window"/></svg><span>窗口与快捷键</span></li>
+      <li data-page="about"><svg><use href="#i-info"/></svg><span>关于</span></li>
+    </ul>
+  </nav>
+
+  <main id="content">
+    <header id="head" data-tauri-drag-region>
+      <h1 id="pageTitle" data-tauri-drag-region>计时环节</h1>
+      <div class="transport">
+        <button class="btn accent" data-cmd="toggle" title="开始 / 暂停"><svg><use href="#i-play"/></svg><span>开始 / 暂停</span></button>
+        <button class="btn icon" data-cmd="reset" title="重置"><svg><use href="#i-reset"/></svg></button>
+        <button class="btn icon" data-cmd="prev" title="上一环节"><svg><use href="#i-prev"/></svg></button>
+        <button class="btn icon" data-cmd="next" title="下一环节"><svg><use href="#i-next"/></svg></button>
+      </div>
+    </header>
+
+    <div id="pages">
+    <!-- ================= 计时环节 ================= -->
+    <section class="page on" id="p-timer">
+      <h2>环节列表</h2>
+      <div class="group">
+        <div class="row block">
+          <div class="rl"><div class="t">每行一个环节:名称 + 时长</div>
+            <div class="d">例如 <code>题库 8秒</code>、<code>答题 1分30秒</code>、<code>休息 2:00</code>、<code>45</code>(纯数字=秒)。按 Ctrl+Enter 快速应用。</div></div>
+          <textarea id="segText" rows="6" spellcheck="false"></textarea>
+          <div class="btns"><button class="btn accent" id="applyText">应用环节</button><span class="note" id="note"></span></div>
+        </div>
+        <div class="row block">
+          <div class="rl"><div class="t">快捷设为单个计时</div></div>
+          <div class="chips" id="quick">
+            <button data-sec="5">5 秒</button><button data-sec="8">8 秒</button><button data-sec="10">10 秒</button><button data-sec="15">15 秒</button><button data-sec="30">30 秒</button>
+            <button data-sec="60">1 分</button><button data-sec="180">3 分</button><button data-sec="300">5 分</button><button data-sec="600">10 分</button><button data-sec="900">15 分</button><button data-sec="1800">30 分</button>
+          </div>
+        </div>
+      </div>
+
+      <h2>流程</h2>
+      <div class="group">
+        <div class="row"><div class="rl"><div class="t">自动进入下一环节</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="autoNext"><i></i></label></div></div>
+        <div class="row"><div class="rl"><div class="t">循环</div><div class="d">最后一个环节结束后回到第一个</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="loop"><i></i></label></div></div>
+        <div class="row"><div class="rl"><div class="t">结束时显示</div><div class="d">留空则显示 00:00</div></div><div class="rc"><input type="text" class="w180" data-k="endText"></div></div>
+      </div>
+
+      <h2>提示</h2>
+      <div class="group">
+        <div class="row"><div class="rl"><div class="t">结束提示音</div></div><div class="rc"><input type="range" class="w160" data-k="beepVolume" min="0" max="1" step="0.05"><output data-fmt="pct"></output><label class="switch"><input type="checkbox" data-k="beep"><i></i></label></div></div>
+        <div class="row"><div class="rl"><div class="t">最后 3 秒滴答声</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="tickBeep"><i></i></label></div></div>
+        <div class="row"><div class="rl"><div class="t">结束时闪烁</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="flashOnEnd"><i></i></label></div></div>
+      </div>
+
+      <h2>配置文件</h2>
+      <div class="group">
+        <div class="row"><div class="rl"><div class="t">导入 / 导出</div><div class="d">txt / csv / json / md,也可以直接拖到本窗口或悬浮窗上</div></div>
+          <div class="rc"><button class="btn" id="btnImport">导入…</button><button class="btn" id="btnExport">导出…</button></div></div>
+      </div>
+    </section>
+
+    <!-- ================= 外观 ================= -->
+    <section class="page" id="p-look">
+      <h2>预设</h2>
+      <div class="group"><div class="row block"><div class="chips" id="presets"></div></div></div>
+
+      <h2>文字</h2>
+      <div class="group">
+        <div class="row"><div class="rl"><div class="t">字体</div><div class="d">留空使用系统字体</div></div><div class="rc"><input type="text" class="w180" data-k="fontFamily" list="fonts" placeholder="系统默认"><datalist id="fonts"></datalist></div></div>
+        <div class="row"><div class="rl"><div class="t">自定义字体文件</div><div class="d" id="fontName">未选择</div></div><div class="rc"><button class="btn" id="btnFont">选择 ttf / otf…</button><button class="btn" id="btnFontClear">清除</button></div></div>
+        <div class="row"><div class="rl"><div class="t">字号</div></div><div class="rc"><input type="range" class="w220" data-k="fontSize" min="16" max="320" step="1"><output></output></div></div>
+        <div class="row"><div class="rl"><div class="t">字重</div></div><div class="rc"><select data-k="fontWeight" data-num><option value="400">常规</option><option value="500">中等</option><option value="600">半粗</option><option value="700">粗体</option><option value="900">特粗</option></select></div></div>
+        <div class="row"><div class="rl"><div class="t">字间距</div></div><div class="rc"><input type="range" class="w220" data-k="letterSpacing" min="-6" max="24" step="1"><output></output></div></div>
+        <div class="row"><div class="rl"><div class="t">文字颜色</div></div><div class="rc"><input type="color" data-k="textColor"></div></div>
+        <div class="row"><div class="rl"><div class="t">时间格式</div></div><div class="rc"><select data-k="timeFormat"><option value="auto">自动(满 1 小时显示 h:mm:ss)</option><option value="mm:ss">mm:ss</option><option value="hh:mm:ss">h:mm:ss</option><option value="sec">仅秒数</option></select></div></div>
+        <div class="row"><div class="rl"><div class="t">显示环节名称</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="showLabel"><i></i></label></div></div>
+        <div class="row"><div class="rl"><div class="t">10 秒内显示小数</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="decimals"><i></i></label></div></div>
+        <div class="row"><div class="rl"><div class="t">临近结束变色</div><div class="d">变色时间点不超过该环节时长的一半</div></div><div class="rc"><input type="number" data-k="warnSec" min="1" max="3600"><span class="unit">秒内</span><input type="color" data-k="warnColor"><label class="switch"><input type="checkbox" data-k="warnEnabled"><i></i></label></div></div>
+      </div>
+
+      <h2>背景与边框</h2>
+      <div class="group">
+        <div class="row"><div class="rl"><div class="t">背景样式</div></div><div class="rc"><select data-k="bgStyle"><option value="solid">纯色</option><option value="gradient">渐变</option><option value="none">无背景(只显示文字)</option></select></div></div>
+        <div class="row"><div class="rl"><div class="t">背景颜色</div><div class="d">第二个颜色是渐变终点</div></div><div class="rc"><input type="color" data-k="bgColor"><input type="color" data-k="bgColor2"></div></div>
+        <div class="row"><div class="rl"><div class="t">背景透明度</div></div><div class="rc"><input type="range" class="w220" data-k="bgOpacity" min="0" max="1" step="0.01"><output data-fmt="pct"></output></div></div>
+        <div class="row"><div class="rl"><div class="t">整体透明度</div></div><div class="rc"><input type="range" class="w220" data-k="windowOpacity" min="0.2" max="1" step="0.01"><output data-fmt="pct"></output></div></div>
+        <div class="row"><div class="rl"><div class="t">圆角</div></div><div class="rc"><input type="range" class="w220" data-k="radius" min="0" max="80" step="1"><output></output></div></div>
+        <div class="row"><div class="rl"><div class="t">边框</div></div><div class="rc"><input type="range" class="w160" data-k="borderWidth" min="0" max="12" step="1"><output></output><input type="color" data-k="borderColor"></div></div>
+        <div class="row"><div class="rl"><div class="t">内边距 左右</div></div><div class="rc"><input type="range" class="w220" data-k="padX" min="0" max="120" step="1"><output></output></div></div>
+        <div class="row"><div class="rl"><div class="t">内边距 上下</div></div><div class="rc"><input type="range" class="w220" data-k="padY" min="0" max="80" step="1"><output></output></div></div>
+        <div class="row"><div class="rl"><div class="t">背景投影</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="shadow"><i></i></label></div></div>
+        <div class="row"><div class="rl"><div class="t">文字阴影</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="textShadow"><i></i></label></div></div>
+        <div class="row"><div class="rl"><div class="t">发光</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="glow"><i></i></label></div></div>
+      </div>
+      <div class="btns end"><button class="btn" id="btnResetStyle">恢复默认外观</button></div>
+    </section>
+
+    <!-- ================= 标题与进度条 ================= -->
+    <section class="page" id="p-title">
+      <h2>自定义标题</h2>
+      <div class="group">
+        <div class="row"><div class="rl"><div class="t">显示标题</div><div class="d">在倒计时数字上方显示一行文字</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="showTitle"><i></i></label></div></div>
+        <div class="row"><div class="rl"><div class="t">标题文字</div></div><div class="rc"><input type="text" class="w260" data-k="titleText" placeholder="例如:第一轮 抢答"></div></div>
+        <div class="row"><div class="rl"><div class="t">标题大小</div><div class="d">相对于倒计时字号</div></div><div class="rc"><input type="range" class="w220" data-k="titleScale" min="0.15" max="1" step="0.01"><output data-fmt="pct"></output></div></div>
+        <div class="row"><div class="rl"><div class="t">标题颜色</div><div class="d">关闭则跟随文字颜色</div></div><div class="rc"><input type="color" id="titleColor"><label class="switch"><input type="checkbox" id="titleColorOn"><i></i></label></div></div>
+      </div>
+
+      <h2>进度条</h2>
+      <div class="group">
+        <div class="row"><div class="rl"><div class="t">显示进度条</div><div class="d">也可以在悬浮窗右键菜单或托盘菜单里切换</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="showProgress"><i></i></label></div></div>
+        <div class="row"><div class="rl"><div class="t">位置</div></div><div class="rc"><select data-k="progressPosition"><option value="bottom">数字下方</option><option value="top">数字上方</option></select></div></div>
+        <div class="row"><div class="rl"><div class="t">粗细</div><div class="d">0 = 随字号自动</div></div><div class="rc"><input type="range" class="w220" data-k="progressHeight" min="0" max="30" step="1"><output data-fmt="px0"></output></div></div>
+      </div>
+    </section>
+
+    <!-- ================= 演示文件 ================= -->
+    <section class="page" id="p-slides">
+      <div class="callout" id="linkUnsupported" hidden>演示联动(检测全屏放映、翻页重新计时)目前只支持 Windows。在这台电脑上可以添加文件,但不会自动联动。</div>
+      <div id="dropzone" tabindex="0">
+        <svg class="dz-ic"><use href="#i-upload"/></svg>
+        <div class="dz-t">把演示文件或文件夹拖到这里</div>
+        <div class="dz-d">支持 PPT / PPTX / PPS / PDF / Keynote / WPS 演示等。拖入文件夹会自动识别其中的演示文件。</div>
+        <div class="btns center"><button class="btn accent" id="btnLink"><svg><use href="#i-file"/></svg><span>选择文件…</span></button><button class="btn" id="btnFolder"><svg><use href="#i-folder"/></svg><span>选择文件夹…</span></button></div>
+        <div class="note" id="dropNote"></div>
+      </div>
+      <div class="group">
+        <div class="row"><div class="rl"><div class="t">包含子文件夹</div><div class="d">从文件夹添加时也扫描子文件夹</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="scanSubfolders"><i></i></label></div></div>
+      </div>
+
+      <h2 class="flex">已添加的演示文件 <span class="count" id="fileCount"></span><button class="btn subtle" id="btnClear">全部移除</button></h2>
+      <div class="group" id="fileList"></div>
+
+      <h2>放映联动</h2>
+      <div class="group">
+        <div class="row"><div class="rl"><div class="t">仅全屏放映时生效</div><div class="d">关闭则在编辑窗口里打开也算</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="linkOnlyFullscreen"><i></i></label></div></div>
+        <div class="row"><div class="rl"><div class="t">仅放映时显示悬浮窗</div><div class="d">其余时间自动隐藏</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="linkShow"><i></i></label></div></div>
+        <div class="row"><div class="rl"><div class="t">放映时自动开始</div><div class="d">退出放映时自动重置</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="linkAutoStart"><i></i></label></div></div>
+        <div class="row"><div class="rl"><div class="t">翻页时</div></div><div class="rc"><select data-k="pageTurn"><option value="restart">重新开始计时(每页限时)</option><option value="none">不处理</option></select></div></div>
+        <div class="row"><div class="rl"><div class="t">计时结束自动翻页</div></div><div class="rc"><input type="number" data-k="autoPageDelay" min="0" max="10000" step="100"><span class="unit">毫秒后</span><label class="switch"><input type="checkbox" data-k="autoPage"><i></i></label></div></div>
+      </div>
+    </section>
+
+    <!-- ================= 窗口与快捷键 ================= -->
+    <section class="page" id="p-window">
+      <h2>悬浮窗</h2>
+      <div class="group">
+        <div class="row"><div class="rl"><div class="t">始终置顶</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="alwaysOnTop"><i></i></label></div></div>
+        <div class="row"><div class="rl"><div class="t">锁定位置</div><div class="d">锁定后不可拖动</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="locked"><i></i></label></div></div>
+        <div class="row"><div class="rl"><div class="t">点击穿透</div><div class="d">鼠标可穿过悬浮窗,用快捷键或托盘菜单恢复</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="clickThrough"><i></i></label></div></div>
+        <div class="row"><div class="rl"><div class="t">拖动时吸附屏幕边缘</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="snap"><i></i></label></div></div>
+        <div class="row"><div class="rl"><div class="t">开机自动启动</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="autoLaunch"><i></i></label></div></div>
+      </div>
+
+      <h2>全局快捷键</h2>
+      <div class="group">
+        <div class="row"><div class="rl"><div class="t">开始 / 暂停</div></div><div class="rc"><input type="text" class="hk" data-hk="toggle" readonly></div></div>
+        <div class="row"><div class="rl"><div class="t">重置</div></div><div class="rc"><input type="text" class="hk" data-hk="reset" readonly></div></div>
+        <div class="row"><div class="rl"><div class="t">下一环节</div></div><div class="rc"><input type="text" class="hk" data-hk="next" readonly></div></div>
+        <div class="row"><div class="rl"><div class="t">显示 / 隐藏</div></div><div class="rc"><input type="text" class="hk" data-hk="show" readonly></div></div>
+        <div class="row"><div class="rl"><div class="t">点击穿透开关</div></div><div class="rc"><input type="text" class="hk" data-hk="through" readonly></div></div>
+      </div>
+      <p class="foot">点击输入框后按下组合键;按 Backspace 清除。需要带 Ctrl / Alt / Shift 等修饰键(F1–F24 除外)。</p>
+    </section>
+
+    <!-- ================= 关于 ================= -->
+    <section class="page" id="p-about">
+      <div class="group">
+        <div class="row"><div class="rl"><div class="t">悬浮倒计时</div><div class="d" id="ver">版本 2.0.0 · Tauri</div></div></div>
+      </div>
+      <h2>使用小技巧</h2>
+      <div class="group">
+        <div class="row"><div class="rl"><div class="t">在悬浮窗上</div><div class="d">按住左键拖动位置 · 双击开始/暂停 · 滚轮调整大小 · 右键打开菜单</div></div></div>
+        <div class="row"><div class="rl"><div class="t">不抢焦点</div><div class="d">悬浮窗不会抢走焦点,放映时按键仍然作用于 PPT</div></div></div>
+        <div class="row"><div class="rl"><div class="t">找回悬浮窗</div><div class="d" id="tipTray">隐藏或穿透后,可在托盘图标找回:左键显示/隐藏,右键菜单,双击打开设置</div></div></div>
+      </div>
+    </section>
+    </div>
+  </main>
+</div>
+
+<div id="dropOverlay"><div><svg><use href="#i-upload"/></svg><div>松开以添加演示文件或计时配置</div></div></div>
+
+<script src="parse.js"></script>
+<script src="common.js"></script>
+<script src="settings.js"></script>
+</body>
+</html>
