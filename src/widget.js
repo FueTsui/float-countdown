@@ -188,7 +188,9 @@ stage.addEventListener('pointerup', endDrag);
 stage.addEventListener('pointercancel', endDrag);
 stage.addEventListener('dblclick', toggle);
 window.addEventListener('contextmenu', (e) => { e.preventDefault(); api.send('show_menu'); });
+// Ctrl+滚轮(Mac 为 Cmd+滚轮)调整大小;普通滚动不处理,避免误改。锁定位置时也不调整
 window.addEventListener('wheel', (e) => {
+  if (!(e.ctrlKey || e.metaKey) || S.locked) return;
   e.preventDefault();
   const v = Math.min(400, Math.max(16, Math.round(S.fontSize + (e.deltaY < 0 ? 4 : -4))));
   S.fontSize = v; api.set({ fontSize: v });
@@ -213,7 +215,8 @@ const CMD = { toggle, start, pause, reset, next: () => jump(1), prev: () => jump
 api.on('cmd', (c) => { if (S && CMD[c]) CMD[c](); });
 api.on('toast', toast);
 api.on('settings', (s) => { S = s; apply(); });
-api.on('link', (a) => {
+api.on('link', (p) => {
+  const a = typeof p === 'object' && p ? p.active : !!p;
   if (!S || !S.linkAutoStart) return;
   if (a) { goFirst(); start(); } else { goFirst(); }
 });

@@ -3,37 +3,91 @@
 #[cfg(windows)]
 use crate::{cmd, settings};
 use crate::AppState;
-#[cfg(windows)]
-use serde_json::Value;
+use serde_json::json;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
-pub fn set_link<R: Runtime>(app: &AppHandle<R>, active: bool) {
+/// 切换联动状态。file 是命中的演示文件路径,前端据此切换该文件专属的计时方案。
+pub fn set_link<R: Runtime>(app: &AppHandle<R>, file: Option<String>) {
     {
         let st = app.state::<AppState>();
         let mut g = st.inner.lock().unwrap();
-        if g.link_active == active {
+        if g.link_file == file {
             return;
         }
-        g.link_active = active;
+        g.link_active = file.is_some();
+        g.link_file = file.clone();
     }
-    let _ = app.emit_to("widget", "link", active);
+    let _ = app.emit("link", json!({ "active": file.is_some(), "file": file }));
     crate::update_visibility(app);
 }
 
-/// 前台窗口标题里是否包含某个已绑定文件的文件名(不含扩展名)
-#[cfg(windows)]
-fn title_matches(s: &Value, title: &str) -> bool {
-    let t = title.to_lowercase();
-    if t.is_empty() {
-        return false;
-    }
-    s["linkFiles"].as_array().map_or(false, |a| {
-        a.iter().filter_map(Value::as_str).any(|f| {
-            let p = std::path::Path::new(f);
-            let stem = p.file_stem().and_then(|x| x.to_str()).unwrap_or("").to_lowercase();
-            !stem.is_empty() && t.contains(&stem)
-        })
+/// 文件名在标题里的出现是否“完整”:前后必须是标题的边界或分隔符,
+/// 避免“题库”误匹配“题库-8秒倒计时版”
+#[cfg_attr(not(windows), allow(dead_code))]
+fn whole_occurrence(t: &str, name: &str) -> bool {
+    const BEFORE: &[char] = &[' ', '[', '(', '【', '"', '“', '「', '《', '\\', '/', '-', '–', '—', ':', '：'];
+    const AFTER: &[char] = &[' ', '.', ']', ')', '】', '"', '”', '」', '》', '|', ':', '：'];
+    t.match_indices(name).any(|(i, _)| {
+        let pre = t[..i].chars().next_back();
+        let post = t[i + name.len()..].chars().next();
+        pre.map_or(true, |c| BEFORE.contains(&c)) && post.map_or(true, |c| AFTER.contains(&c))
     })
+}
+
+/// 在已绑定的文件里找出与窗口标题最匹配的一个:
+/// 先比“文件名.扩展名”,再比不带扩展名的文件名(要求完整出现);多个命中时取最长的。
+#[cfg_attr(not(windows), allow(dead_code))]
+pub fn best_match(files: &[String], title: &str) -> Option<String> {
+    let t = title.to_lowercase();
+    if t.trim().is_empty() {
+        return None;
+    }
+    let mut best: Option<(usize, &String)> = None;
+    for f in files {
+        // 同时按 \ 和 / 拆分,Windows 路径在任何系统上都能正确取到文件名
+        let full = f.rsplit(['\\', '/']).next().unwrap_or("").to_lowercase();
+        let stem = match full.rfind('.') {
+            Some(i) if i > 0 => full[..i].to_string(),
+            _ => full.clone(),
+        };
+        let score = if !full.is_empty() && t.contains(&full) {
+            full.chars().count() + 1000
+        } else if !stem.is_empty() && whole_occurrence(&t, &stem) {
+            stem.chars().count()
+        } else {
+            continue;
+        };
+        if best.map_or(true, |(s, _)| score > s) {
+            best = Some((score, f));
+        }
+    }
+    best.map(|(_, f)| f.clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::best_match;
+    fn files() -> Vec<String> {
+        vec![r"C:\a\题库.pptx".into(), r"C:\a\题库-8秒倒计时版.pptx".into(), r"D:\年度汇报.pdf".into()]
+    }
+    #[test]
+    fn picks_the_longer_name() {
+        assert_eq!(best_match(&files(), "PowerPoint 幻灯片放映 - 题库-8秒倒计时版").as_deref(), Some(r"C:\a\题库-8秒倒计时版.pptx"));
+        assert_eq!(best_match(&files(), "PowerPoint 幻灯片放映 - 题库").as_deref(), Some(r"C:\a\题库.pptx"));
+        assert_eq!(best_match(&files(), "题库.pptx - PowerPoint").as_deref(), Some(r"C:\a\题库.pptx"));
+    }
+    #[test]
+    fn only_the_short_file_bound_does_not_match_the_long_one() {
+        let only = vec![r"C:\a\题库.pptx".to_string()];
+        assert_eq!(best_match(&only, "PowerPoint 幻灯片放映 - 题库-8秒倒计时版"), None);
+        assert_eq!(best_match(&only, "题库2 - PowerPoint"), None);
+        assert!(best_match(&only, "PowerPoint 幻灯片放映 - [题库]").is_some());
+    }
+    #[test]
+    fn pdf_in_browser() {
+        assert!(best_match(&files(), "年度汇报.pdf - Microsoft Edge").is_some());
+        assert_eq!(best_match(&files(), ""), None);
+    }
 }
 
 #[cfg(windows)]
@@ -171,17 +225,16 @@ fn poll_loop<R: Runtime>(app: AppHandle<R>) {
             continue; // 前台是本程序自己时保持原状态
         }
         let only_full = s["linkOnlyFullscreen"].as_bool().unwrap_or(true);
-        let hit = title_matches(&s, &fg.title) && (!only_full || fg.fullscreen);
-        if hit {
+        let files: Vec<String> = s["linkFiles"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect()).unwrap_or_default();
+        let hit = if !only_full || fg.fullscreen { best_match(&files, &fg.title) } else { None };
+        if let Some(f) = hit {
             miss = 0;
-            if !active {
-                set_link(&app, true);
-            }
+            set_link(&app, Some(f));
         } else if active {
             miss += 1;
             if miss >= 3 {
                 miss = 0;
-                set_link(&app, false);
+                set_link(&app, None);
             }
         }
     }

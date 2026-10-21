@@ -68,6 +68,7 @@ pub struct Inner {
     timer_state: String,
     user_visible: bool,
     pub link_active: bool,
+    pub link_file: Option<String>,
     force_show_until: Option<Instant>,
     drag: Option<Drag>,
 }
@@ -91,21 +92,61 @@ pub fn cmd<R: Runtime>(app: &AppHandle<R>, c: &str) {
     let _ = app.emit_to("widget", "cmd", c);
 }
 pub fn toast<R: Runtime>(app: &AppHandle<R>, m: impl Into<String>) {
-    let _ = app.emit_to("widget", "toast", m.into());
+    // 发给所有窗口:悬浮窗显示在名称行,设置窗口显示在顶部提示条
+    let _ = app.emit("toast", m.into());
 }
 fn b(v: &Value, k: &str) -> bool {
     v.get(k).and_then(Value::as_bool).unwrap_or(false)
 }
 
 // ---------- 设置 ----------
-fn load_settings(file: &Path) -> Value {
-    let mut d = defaults();
-    if let Ok(txt) = std::fs::read_to_string(file) {
-        if let Ok(Value::Object(j)) = serde_json::from_str::<Value>(&txt) {
-            merge(&mut d, &Value::Object(j));
-        }
+fn backup_path(file: &Path) -> PathBuf {
+    file.with_extension("bak.json")
+}
+
+fn read_json(file: &Path) -> Option<Value> {
+    let txt = std::fs::read_to_string(file).ok()?;
+    match serde_json::from_str::<Value>(&txt) {
+        Ok(v @ Value::Object(_)) => Some(v),
+        _ => None,
     }
-    d
+}
+
+/// 读取设置。主文件损坏时改读备份,并返回一条提示。
+fn load_settings(file: &Path) -> (Value, Option<String>) {
+    let mut d = defaults();
+    let mut warn = None;
+    let j = match read_json(file) {
+        Some(j) => Some(j),
+        None if file.exists() => {
+            let bak = read_json(&backup_path(file));
+            warn = Some(if bak.is_some() { "设置文件损坏,已从备份恢复" } else { "设置文件损坏,已恢复默认设置" }.to_string());
+            bak
+        }
+        None => None,
+    };
+    if let Some(j) = j {
+        merge(&mut d, &j);
+    }
+    (d, warn)
+}
+
+/// 安全写入:先写临时文件,旧文件留作备份,再替换。中途断电也不会留下半个文件。
+fn write_settings(file: &Path, txt: &str) -> std::io::Result<()> {
+    if let Some(dir) = file.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let tmp = file.with_extension("json.tmp");
+    {
+        use std::io::Write;
+        let mut f = std::fs::File::create(&tmp)?;
+        f.write_all(txt.as_bytes())?;
+        f.sync_all()?;
+    }
+    if read_json(file).is_some() {
+        let _ = std::fs::copy(file, backup_path(file));
+    }
+    std::fs::rename(&tmp, file)
 }
 
 /// 只接受默认值里存在的键;hotkeys 做浅合并
@@ -139,10 +180,9 @@ fn save_soon<R: Runtime>(app: &AppHandle<R>) {
             return;
         }
         let txt = serde_json::to_string_pretty(&state.inner.lock().unwrap().s).unwrap_or_default();
-        if let Some(dir) = state.file.parent() {
-            let _ = std::fs::create_dir_all(dir);
+        if let Err(e) = write_settings(&state.file, &txt) {
+            toast(&app, format!("设置保存失败: {e}"));
         }
-        let _ = std::fs::write(&state.file, txt);
     });
 }
 
@@ -181,7 +221,7 @@ fn after_patch<R: Runtime>(app: &AppHandle<R>, prev: &Value, cur: &Value) {
         update_visibility(app);
     }
     if changed("linkFiles") && cur["linkFiles"].as_array().map_or(true, |a| a.is_empty()) {
-        link::set_link(app, false);
+        link::set_link(app, None);
     }
     if changed("autoLaunch") && prev.get("autoLaunch").is_some() {
         use tauri_plugin_autostart::ManagerExt;
@@ -214,7 +254,9 @@ fn create_widget<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .focused(false)
         .focusable(false)
         .visible(false)
-        .visible_on_all_workspaces(true);
+        .visible_on_all_workspaces(true)
+        // 悬浮窗经常处于隐藏状态,必须关闭后台节流,否则计时、提示音和自动翻页会被延迟
+        .background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled);
     #[cfg(windows)]
     {
         wb = wb.additional_browser_args(BROWSER_ARGS);
@@ -794,7 +836,26 @@ pub fn run() {
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]
-            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            {
+                app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                // macOS 的复制/粘贴快捷键依赖应用菜单里的“编辑”菜单,没有它输入框里 Cmd+C/V 无效
+                use tauri::menu::Submenu;
+                let h = app.handle();
+                let edit = Submenu::with_items(h, "编辑", true, &[
+                    &PredefinedMenuItem::undo(h, None)?,
+                    &PredefinedMenuItem::redo(h, None)?,
+                    &PredefinedMenuItem::separator(h)?,
+                    &PredefinedMenuItem::cut(h, None)?,
+                    &PredefinedMenuItem::copy(h, None)?,
+                    &PredefinedMenuItem::paste(h, None)?,
+                    &PredefinedMenuItem::select_all(h, None)?,
+                ])?;
+                let app_menu = Submenu::with_items(h, "悬浮倒计时", true, &[
+                    &PredefinedMenuItem::hide(h, None)?,
+                    &PredefinedMenuItem::quit(h, None)?,
+                ])?;
+                app.set_menu(Menu::with_items(h, &[&app_menu, &edit])?)?;
+            }
             let handle = app.handle().clone();
             let file = app.path().app_config_dir()?.join("settings.json");
             let first_run = !file.exists();
@@ -804,12 +865,14 @@ pub fn run() {
                 Ok(o) if first_run && o.exists() => o,
                 _ => file.clone(),
             };
+            let (loaded, load_warn) = load_settings(&load_from);
             app.manage(AppState {
                 inner: Mutex::new(Inner {
-                    s: load_settings(&load_from),
+                    s: loaded,
                     timer_state: "idle".into(),
                     user_visible: true,
                     link_active: false,
+                    link_file: None,
                     force_show_until: Some(Instant::now() + Duration::from_secs(4)),
                     drag: None,
                 }),
@@ -825,6 +888,13 @@ pub fn run() {
             // 第一次运行时打开设置窗口,方便上手
             if first_run {
                 open_settings(&handle);
+            }
+            if let Some(w) = load_warn {
+                let h = handle.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(Duration::from_millis(1500));
+                    toast(&h, w);
+                });
             }
             let h2 = handle.clone();
             std::thread::spawn(move || {
@@ -885,6 +955,20 @@ mod tests {
         let mut top = vec![];
         scan_dir(&d, 0, &mut top);
         assert_eq!(top.len(), 2);
+    }
+
+    #[test]
+    fn corrupt_settings_fall_back_to_backup() {
+        let d = std::env::temp_dir().join("cd_save_test");
+        let _ = std::fs::remove_dir_all(&d);
+        let f = d.join("settings.json");
+        write_settings(&f, r#"{"showTitle": true}"#).unwrap();
+        write_settings(&f, r#"{"showTitle": true, "titleText": "新"}"#).unwrap();
+        assert_eq!(load_settings(&f).0["titleText"], json!("新"));
+        std::fs::write(&f, "{ 写到一半").unwrap();
+        let (s, warn) = load_settings(&f);
+        assert_eq!(s["showTitle"], json!(true));
+        assert!(warn.unwrap().contains("备份"));
     }
 
     #[test]

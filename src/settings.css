@@ -363,3 +363,10 @@ html[data-os="macos"] .file .ic { width: 26px; height: 26px; border-radius: 5px;
 html[data-os="macos"] #pages::-webkit-scrollbar { width: 0; }
 html[data-os="macos"] .switch input:checked + i { background: var(--accent); }
 html[data-os="macos"] .file .btn.icon { box-shadow: none; }
+
+/* 提示条:从底部浮出 */
+#toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); max-width: 80%; padding: 10px 16px; border-radius: var(--radius-card);
+  background: var(--card); border: 1px solid var(--ctl-border); box-shadow: 0 8px 24px rgba(0,0,0,.16); opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 60; }
+html:not(.material) #toast, html[data-theme="dark"] #toast { background: var(--win-bg); }
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+@media (prefers-reduced-motion: reduce) { .page, #toast, .switch i, .switch i::after { animation: none !important; transition: none !important; } }

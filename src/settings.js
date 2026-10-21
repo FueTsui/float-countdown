@@ -232,6 +232,13 @@ for (const el of $$('[data-hk]')) {
   });
 }
 
+// ---------- 提示条 ----------
+api.on('toast', (m) => {
+  const el = $('#toast');
+  el.textContent = m; el.classList.add('show');
+  clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 3200);
+});
+
 // ---------- 启动 ----------
 api.on('settings', (s) => { S = s; refresh(); });
 initPlatform().then(() => api.getSettings()).then((s) => { S = s; refresh(); });
