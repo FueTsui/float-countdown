@@ -107,6 +107,8 @@ mod win {
         pub pid: u32,
         pub fullscreen: bool,
         pub title: String,
+        /// 前台窗口所在屏幕:x, y, 宽, 高
+        pub mon: (i32, i32, i32, i32),
     }
 
     pub fn foreground() -> Option<Fg> {
@@ -122,13 +124,15 @@ mod win {
             let _ = GetWindowRect(h, &mut r);
             let mon = MonitorFromWindow(h, MONITOR_DEFAULTTONEAREST);
             let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
-            let fullscreen = GetMonitorInfoW(mon, &mut mi).as_bool() && {
+            let ok = GetMonitorInfoW(mon, &mut mi).as_bool();
+            let fullscreen = ok && {
                 let m = mi.rcMonitor;
                 r.left <= m.left && r.top <= m.top && r.right >= m.right && r.bottom >= m.bottom
             };
             let mut pid = 0u32;
             GetWindowThreadProcessId(h, Some(&mut pid));
-            Some(Fg { pid, fullscreen, title })
+            let m = mi.rcMonitor;
+            Some(Fg { pid, fullscreen, title, mon: (m.left, m.top, m.right - m.left, m.bottom - m.top) })
         }
     }
 
@@ -232,6 +236,9 @@ fn poll_loop<R: Runtime>(app: AppHandle<R>) {
         let hit = if !only_full || fg.fullscreen { best_match(&files, &fg.title) } else { None };
         if let Some(f) = hit {
             miss = 0;
+            if !active && s["followScreen"].as_bool().unwrap_or(true) {
+                crate::move_widget_to_monitor(&app, fg.mon);
+            }
             set_link(&app, Some(f));
         } else if active {
             miss += 1;

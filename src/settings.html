@@ -34,12 +34,12 @@
       <svg><use href="#i-menu"/></svg><span class="cl-text">设置</span>
     </button>
     <ul id="nav">
-      <li data-page="slides" class="on" title="演示文件"><svg><use href="#i-slides"/></svg><span>演示文件</span></li>
-      <li data-page="timer" title="计时环节"><svg><use href="#i-timer"/></svg><span>计时环节</span></li>
-      <li data-page="look" title="外观"><svg><use href="#i-palette"/></svg><span>外观</span></li>
-      <li data-page="title" title="标题与进度条"><svg><use href="#i-title"/></svg><span>标题与进度条</span></li>
-      <li data-page="window" title="窗口与快捷键"><svg><use href="#i-window"/></svg><span>窗口与快捷键</span></li>
-      <li data-page="about" title="关于"><svg><use href="#i-info"/></svg><span>关于</span></li>
+      <li tabindex="0" role="button" data-page="slides" class="on" title="演示文件"><svg><use href="#i-slides"/></svg><span>演示文件</span></li>
+      <li tabindex="0" role="button" data-page="timer" title="计时环节"><svg><use href="#i-timer"/></svg><span>计时环节</span></li>
+      <li tabindex="0" role="button" data-page="look" title="外观"><svg><use href="#i-palette"/></svg><span>外观</span></li>
+      <li tabindex="0" role="button" data-page="title" title="标题与进度条"><svg><use href="#i-title"/></svg><span>标题与进度条</span></li>
+      <li tabindex="0" role="button" data-page="window" title="窗口与快捷键"><svg><use href="#i-window"/></svg><span>窗口与快捷键</span></li>
+      <li tabindex="0" role="button" data-page="about" title="关于"><svg><use href="#i-info"/></svg><span>关于</span></li>
     </ul>
   </nav>
 
@@ -170,9 +170,14 @@
       <h2 class="flex">已添加的演示文件 <span class="count" id="fileCount"></span><button class="btn subtle" id="btnClear">全部移除</button></h2>
       <div class="group" id="fileList"></div>
 
+      <h2 id="watchHead" hidden>监视的文件夹</h2>
+      <div class="group" id="watchList" hidden></div>
+      <div class="hint-line" id="watchHint" hidden>这些文件夹里新增的演示文件,会在启动或打开设置时自动添加。</div>
+
       <h2>放映联动</h2>
       <div class="group">
         <div class="row"><div class="rl"><div class="t">仅全屏放映时生效</div><div class="d">关闭则在编辑窗口里打开也算</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="linkOnlyFullscreen"><i></i></label></div></div>
+        <div class="row"><div class="rl"><div class="t">悬浮窗跟随放映屏幕</div><div class="d">接投影仪时,放映开始自动移到放映所在的屏幕</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="followScreen"><i></i></label></div></div>
         <div class="row"><div class="rl"><div class="t">仅放映时显示悬浮窗</div><div class="d">其余时间自动隐藏</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="linkShow"><i></i></label></div></div>
         <div class="row"><div class="rl"><div class="t">放映时自动开始</div><div class="d">退出放映时自动重置</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="linkAutoStart"><i></i></label></div></div>
         <div class="row"><div class="rl"><div class="t">向后翻页时</div><div class="d">→ ↓ PgDn 空格 回车 鼠标点击</div></div><div class="rc"><select data-k="pageTurn"><option value="restart">重新开始计时(每页限时)</option><option value="none">不处理</option></select></div></div>

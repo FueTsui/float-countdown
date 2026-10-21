@@ -428,3 +428,10 @@ body.collapsed .collapse { justify-content: center; padding: 0; }
 body.collapsed #sidebar { padding-left: 6px; padding-right: 6px; }
 html[data-os="macos"] .collapse { height: 28px; gap: 8px; padding: 0 8px; }
 html[data-os="macos"] #sidebar { padding-top: 40px; }
+
+.file .ic.folder { background: var(--subtle-hover); color: var(--accent-text); }
+.file .ic.folder svg { width: 18px; height: 18px; }
+.hint-line { color: var(--fg2); font-size: 12px; margin: 6px 2px 0; }
+
+/* 键盘焦点:所有控件统一的焦点框 */
+button:focus-visible, select:focus-visible, input[type=color]:focus-visible, input[type=range]:focus-visible, #nav li:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

@@ -1,7 +1,12 @@
 #![recursion_limit = "256"]
 // 悬浮倒计时 · 主进程(Rust / Tauri 2)
 // 负责:设置读写、窗口管理、托盘菜单、全局快捷键、文件/文件夹导入、演示联动。
+mod files;
 mod link;
+mod settings;
+
+use files::*;
+use settings::*;
 
 use serde_json::{json, Map, Value};
 use std::path::{Path, PathBuf};
@@ -14,55 +19,12 @@ use tauri::{
     AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, Runtime, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder,
 };
-use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 /// 悬浮窗内部留给阴影的边距(逻辑像素),需与 widget.html 一致
 const PAD: f64 = 24.0;
 
-/// 演示文件扩展名
-pub const PRESENTATION_EXT: &[&str] = &[
-    "pptx", "ppt", "pptm", "ppsx", "pps", "ppsm", "potx", "pdf", "odp", "key", "dps", "dpt",
-];
-/// 计时配置文件扩展名
-const CONFIG_EXT: &[&str] = &["txt", "csv", "json", "md", "cfg", "ini", "list"];
-
-/// 恢复默认外观时重置的键,也是导入/导出配置时会带上的样式键
-const STYLE_KEYS: &[&str] = &[
-    "fontFamily", "fontFile", "fontSize", "fontWeight", "letterSpacing", "textColor", "warnEnabled", "warnSec",
-    "warnColor", "bgStyle", "bgColor", "bgColor2", "bgOpacity", "windowOpacity", "radius", "borderWidth",
-    "borderColor", "shadow", "textShadow", "glow", "padX", "padY", "showLabel", "showProgress", "progressHeight",
-    "progressPosition", "showTitle", "titleText", "titleScale", "titleColor", "timeFormat", "decimals",
-];
-
-fn defaults() -> Value {
-    json!({
-        "x": null, "y": null,
-        "segments": [{ "name": "", "sec": 60 }], "loop": false, "autoNext": true,
-        "endText": "时间到", "beep": true, "beepVolume": 0.5, "tickBeep": false, "flashOnEnd": true,
-        "fontFamily": "Bahnschrift", "fontFile": "", "fontSize": 72, "fontWeight": 700, "letterSpacing": 0,
-        "textColor": "#ffffff", "warnEnabled": true, "warnSec": 10, "warnColor": "#ff4d4f",
-        "bgStyle": "solid", "bgColor": "#0f172a", "bgColor2": "#334155", "bgOpacity": 0.78, "windowOpacity": 1,
-        "radius": 18, "borderWidth": 0, "borderColor": "#ffffff", "shadow": true, "textShadow": false, "glow": false,
-        "padX": 30, "padY": 14, "showLabel": true, "timeFormat": "auto", "decimals": false,
-        // 进度条
-        "showProgress": true, "progressHeight": 0, "progressPosition": "bottom",
-        // 自定义标题
-        "showTitle": false, "titleText": "", "titleScale": 0.34, "titleColor": "",
-        "locked": false, "clickThrough": false, "alwaysOnTop": true, "snap": true, "autoLaunch": false,
-        "linkFiles": [], "linkOnlyFullscreen": true, "linkShow": false, "linkAutoStart": true, "pageTurn": "restart",
-        "autoPage": false, "autoPageDelay": 1000, "scanSubfolders": true,
-        // 向前翻页:none 不处理 / restart 重新计时
-        "prevPage": "none",
-        // 到时后继续计时并显示超时(-00:12)
-        "overtime": false,
-        // 每个演示文件单独的计时方案:{ "路径": { "segments": [...], "loop": false } }
-        "fileProfiles": {},
-        "hotkeys": { "toggle": "Ctrl+Alt+S", "reset": "Ctrl+Alt+R", "show": "Ctrl+Alt+H", "through": "Ctrl+Alt+T", "next": "Ctrl+Alt+N" }
-    })
-}
-
-struct Drag {
+pub(crate) struct Drag {
     cx: f64,
     cy: f64,
     x: i32,
@@ -85,13 +47,13 @@ pub struct AppState {
     file: PathBuf,
 }
 
-fn st<R: Runtime>(app: &AppHandle<R>) -> tauri::State<'_, AppState> {
+pub(crate) fn st<R: Runtime>(app: &AppHandle<R>) -> tauri::State<'_, AppState> {
     app.state::<AppState>()
 }
 pub fn settings<R: Runtime>(app: &AppHandle<R>) -> Value {
     st(app).inner.lock().unwrap().s.clone()
 }
-fn widget<R: Runtime>(app: &AppHandle<R>) -> Option<WebviewWindow<R>> {
+pub(crate) fn widget<R: Runtime>(app: &AppHandle<R>) -> Option<WebviewWindow<R>> {
     app.get_webview_window("widget")
 }
 pub fn cmd<R: Runtime>(app: &AppHandle<R>, c: &str) {
@@ -103,76 +65,6 @@ pub fn toast<R: Runtime>(app: &AppHandle<R>, m: impl Into<String>) {
 }
 fn b(v: &Value, k: &str) -> bool {
     v.get(k).and_then(Value::as_bool).unwrap_or(false)
-}
-
-// ---------- 设置 ----------
-fn backup_path(file: &Path) -> PathBuf {
-    file.with_extension("bak.json")
-}
-
-fn read_json(file: &Path) -> Option<Value> {
-    let txt = std::fs::read_to_string(file).ok()?;
-    match serde_json::from_str::<Value>(&txt) {
-        Ok(v @ Value::Object(_)) => Some(v),
-        _ => None,
-    }
-}
-
-/// 读取设置。主文件损坏时改读备份,并返回一条提示。
-fn load_settings(file: &Path) -> (Value, Option<String>) {
-    let mut d = defaults();
-    let mut warn = None;
-    let j = match read_json(file) {
-        Some(j) => Some(j),
-        None if file.exists() => {
-            let bak = read_json(&backup_path(file));
-            warn = Some(if bak.is_some() { "设置文件损坏,已从备份恢复" } else { "设置文件损坏,已恢复默认设置" }.to_string());
-            bak
-        }
-        None => None,
-    };
-    if let Some(j) = j {
-        merge(&mut d, &j);
-    }
-    (d, warn)
-}
-
-/// 安全写入:先写临时文件,旧文件留作备份,再替换。中途断电也不会留下半个文件。
-fn write_settings(file: &Path, txt: &str) -> std::io::Result<()> {
-    if let Some(dir) = file.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    let tmp = file.with_extension("json.tmp");
-    {
-        use std::io::Write;
-        let mut f = std::fs::File::create(&tmp)?;
-        f.write_all(txt.as_bytes())?;
-        f.sync_all()?;
-    }
-    if read_json(file).is_some() {
-        let _ = std::fs::copy(file, backup_path(file));
-    }
-    std::fs::rename(&tmp, file)
-}
-
-/// 只接受默认值里存在的键;hotkeys 做浅合并
-fn merge(dst: &mut Value, p: &Value) {
-    let Some(p) = p.as_object() else { return };
-    let dmap = dst.as_object_mut().unwrap();
-    for (k, v) in p {
-        if !dmap.contains_key(k) {
-            continue;
-        }
-        if k == "hotkeys" {
-            if let (Some(Value::Object(h)), Some(nv)) = (dmap.get_mut("hotkeys"), v.as_object()) {
-                for (hk, hv) in nv {
-                    h.insert(hk.clone(), hv.clone());
-                }
-            }
-        } else {
-            dmap.insert(k.clone(), v.clone());
-        }
-    }
 }
 
 fn save_soon<R: Runtime>(app: &AppHandle<R>) {
@@ -296,6 +188,28 @@ fn valid_pos<R: Runtime>(app: &AppHandle<R>, x: f64, y: f64) -> bool {
             x >= bx - 100.0 && x < bx + bw - 60.0 && y >= by - 100.0 && y < by + bh - 40.0
         })
     })
+}
+
+fn monitor_key(r: (i32, i32, i32, i32)) -> String {
+    format!("{},{},{},{}", r.0, r.1, r.2, r.3)
+}
+
+/// 放映开始时让悬浮窗跟到放映所在的屏幕(rect = 该屏幕的 x, y, 宽, 高)。
+/// 已经在这块屏幕上就不动;去过的屏幕用上次的位置,第一次去放在右上角。
+pub fn move_widget_to_monitor<R: Runtime>(app: &AppHandle<R>, rect: (i32, i32, i32, i32)) {
+    let Some(w) = widget(app) else { return };
+    let (Ok(p), Ok(sz)) = (w.outer_position(), w.outer_size()) else { return };
+    let (cx, cy) = (p.x + sz.width as i32 / 2, p.y + sz.height as i32 / 2);
+    if cx >= rect.0 && cx < rect.0 + rect.2 && cy >= rect.1 && cy < rect.1 + rect.3 {
+        return;
+    }
+    let s = settings(app);
+    let remembered = s["screenPos"][monitor_key(rect)].as_array().and_then(|a| Some((a.first()?.as_i64()? as i32, a.get(1)?.as_i64()? as i32)));
+    let (x, y) = remembered.unwrap_or_else(|| {
+        let sf = w.scale_factor().unwrap_or(1.0);
+        (rect.0 + rect.2 - sz.width as i32 - (20.0 * sf) as i32 + (PAD * sf) as i32, rect.1 + (20.0 * sf) as i32 - (PAD * sf) as i32)
+    });
+    let _ = w.set_position(PhysicalPosition::new(x, y));
 }
 
 /// 显示悬浮窗但不抢焦点
@@ -512,171 +426,6 @@ fn register_hotkeys<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-// ---------- 文件:演示文件 / 文件夹 / 配置 ----------
-fn ext_of(p: &Path) -> String {
-    p.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase()
-}
-fn is_presentation(p: &Path) -> bool {
-    let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
-    // 跳过 Office 打开时产生的临时文件 "~$xxx.pptx" 和隐藏文件
-    !name.starts_with("~$") && !name.starts_with('.') && PRESENTATION_EXT.contains(&ext_of(p).as_str())
-}
-
-/// 扫描文件夹里的演示文件
-fn scan_dir(dir: &Path, depth: u32, out: &mut Vec<String>) {
-    let Ok(rd) = std::fs::read_dir(dir) else { return };
-    let mut entries: Vec<_> = rd.flatten().map(|e| e.path()).collect();
-    entries.sort();
-    for p in entries {
-        if out.len() >= 1000 {
-            return;
-        }
-        if p.is_dir() {
-            let hidden = p.file_name().and_then(|n| n.to_str()).map_or(true, |n| n.starts_with('.') || n.starts_with('$'));
-            if depth > 0 && !hidden {
-                scan_dir(&p, depth - 1, out);
-            }
-        } else if is_presentation(&p) {
-            out.push(p.to_string_lossy().into_owned());
-        }
-    }
-}
-
-/// 处理拖入或选中的路径:文件夹自动识别其中的演示文件;演示文件直接绑定;
-/// 配置文件交给前端解析(返回在 configs 里)。
-#[tauri::command]
-fn add_paths<R: Runtime>(app: AppHandle<R>, paths: Vec<String>) -> Value {
-    let s = settings(&app);
-    let depth = if b(&s, "scanSubfolders") { 6 } else { 0 };
-    let (mut found, mut configs, mut skipped, mut dirs) = (vec![], vec![], 0u32, 0u32);
-    for p in &paths {
-        let pb = PathBuf::from(p);
-        if pb.is_dir() {
-            dirs += 1;
-            scan_dir(&pb, depth, &mut found);
-        } else if is_presentation(&pb) {
-            found.push(p.clone());
-        } else if CONFIG_EXT.contains(&ext_of(&pb).as_str()) {
-            configs.push(p.clone());
-        } else {
-            skipped += 1;
-        }
-    }
-    let mut list: Vec<String> = s["linkFiles"]
-        .as_array()
-        .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
-        .unwrap_or_default();
-    let before = list.len();
-    for p in &found {
-        if !list.iter().any(|x| x.eq_ignore_ascii_case(p)) {
-            list.push(p.clone());
-        }
-    }
-    let added = list.len() - before;
-    if added > 0 {
-        patch(&app, json!({ "linkFiles": list }));
-    }
-    let msg = if added > 0 {
-        format!("已添加 {added} 个演示文件")
-    } else if !found.is_empty() {
-        "这些演示文件已经在列表里了".into()
-    } else if dirs > 0 {
-        "文件夹里没有找到演示文件".into()
-    } else if skipped > 0 && configs.is_empty() {
-        "不支持的文件类型".into()
-    } else {
-        String::new()
-    };
-    if !msg.is_empty() {
-        toast(&app, msg.clone());
-    }
-    json!({ "added": added, "found": found.len(), "configs": configs, "skipped": skipped, "message": msg })
-}
-
-fn settings_window<R: Runtime>(app: &AppHandle<R>) -> Option<WebviewWindow<R>> {
-    app.get_webview_window("settings")
-}
-
-fn pick_link_files<R: Runtime>(app: &AppHandle<R>) -> Value {
-    let mut d = app.dialog().file().set_title("选择演示文件").add_filter("演示文件", PRESENTATION_EXT);
-    if let Some(w) = settings_window(app) {
-        d = d.set_parent(&w);
-    }
-    match d.blocking_pick_files() {
-        Some(fs) => add_paths(app.clone(), fs.into_iter().map(|p| p.to_string()).collect()),
-        None => Value::Null,
-    }
-}
-
-fn pick_link_folder<R: Runtime>(app: &AppHandle<R>) -> Value {
-    let mut d = app.dialog().file().set_title("选择包含演示文件的文件夹");
-    if let Some(w) = settings_window(app) {
-        d = d.set_parent(&w);
-    }
-    match d.blocking_pick_folders() {
-        Some(fs) => add_paths(app.clone(), fs.into_iter().map(|p| p.to_string()).collect()),
-        None => Value::Null,
-    }
-}
-
-#[tauri::command]
-async fn pick_files<R: Runtime>(app: AppHandle<R>) -> Value {
-    pick_link_files(&app)
-}
-#[tauri::command]
-async fn pick_folder<R: Runtime>(app: AppHandle<R>) -> Value {
-    pick_link_folder(&app)
-}
-
-#[tauri::command]
-async fn pick_config<R: Runtime>(app: AppHandle<R>) -> Option<String> {
-    let mut d = app.dialog().file().set_title("导入计时配置").add_filter("计时配置", &["txt", "csv", "json", "md"]);
-    if let Some(w) = settings_window(&app) {
-        d = d.set_parent(&w);
-    }
-    d.blocking_pick_file().map(|p| p.to_string())
-}
-
-#[tauri::command]
-async fn pick_font<R: Runtime>(app: AppHandle<R>) {
-    let mut d = app.dialog().file().set_title("选择字体文件").add_filter("字体", &["ttf", "otf", "woff", "woff2", "ttc"]);
-    if let Some(w) = settings_window(&app) {
-        d = d.set_parent(&w);
-    }
-    if let Some(p) = d.blocking_pick_file() {
-        patch(&app, json!({ "fontFile": p.to_string() }));
-    }
-}
-
-#[tauri::command]
-async fn export_config<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
-    let mut d = app.dialog().file().set_title("导出当前配置").set_file_name("倒计时配置.json").add_filter("JSON", &["json"]);
-    if let Some(w) = settings_window(&app) {
-        d = d.set_parent(&w);
-    }
-    let Some(p) = d.blocking_save_file() else { return Ok(()) };
-    let p = p.into_path().map_err(|e| e.to_string())?;
-    let s = settings(&app);
-    let mut set = Map::new();
-    for k in STYLE_KEYS.iter().chain(["endText", "autoNext"].iter()) {
-        set.insert(k.to_string(), s[*k].clone());
-    }
-    let out = json!({ "segments": s["segments"], "loop": s["loop"], "settings": set });
-    std::fs::write(&p, serde_json::to_string_pretty(&out).unwrap()).map_err(|e| e.to_string())?;
-    toast(&app, format!("已导出: {}", p.file_name().and_then(|n| n.to_str()).unwrap_or("")));
-    Ok(())
-}
-
-/// 读取文本文件,先按 UTF-8,失败再按 GBK
-#[tauri::command]
-fn read_text(path: String) -> Result<String, String> {
-    let buf = std::fs::read(&path).map_err(|e| e.to_string())?;
-    Ok(match String::from_utf8(buf) {
-        Ok(s) => s,
-        Err(e) => encoding_rs::GBK.decode(e.as_bytes()).0.into_owned(),
-    })
-}
-
 // ---------- 其余 IPC ----------
 #[tauri::command]
 fn get_settings<R: Runtime>(app: AppHandle<R>) -> Value {
@@ -712,6 +461,38 @@ fn remove_link<R: Runtime>(app: AppHandle<R>, path: Option<String>) {
         profiles.clear();
     }
     patch(&app, json!({ "linkFiles": list, "fileProfiles": profiles }));
+}
+
+/// 重新扫描所有监视的文件夹,把新出现的演示文件加进列表
+pub(crate) fn rescan_folders_inner<R: Runtime>(app: &AppHandle<R>) -> usize {
+    let s = settings(app);
+    let depth = if b(&s, "scanSubfolders") { 6 } else { 0 };
+    let mut list: Vec<String> = s["linkFiles"].as_array().map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect()).unwrap_or_default();
+    let before = list.len();
+    for d in s["watchFolders"].as_array().into_iter().flatten().filter_map(Value::as_str) {
+        let mut found = vec![];
+        scan_dir(Path::new(d), depth, &mut found);
+        for p in found {
+            if !list.iter().any(|x| x.eq_ignore_ascii_case(&p)) {
+                list.push(p);
+            }
+        }
+    }
+    let added = list.len() - before;
+    if added > 0 {
+        patch(app, json!({ "linkFiles": list }));
+        toast(app, format!("监视的文件夹里发现 {added} 个新的演示文件,已添加"));
+    }
+    added
+}
+#[tauri::command]
+fn rescan_folders<R: Runtime>(app: AppHandle<R>) -> usize {
+    rescan_folders_inner(&app)
+}
+#[tauri::command]
+fn remove_folder<R: Runtime>(app: AppHandle<R>, path: String) {
+    let list: Vec<Value> = settings(&app)["watchFolders"].as_array().cloned().unwrap_or_default().into_iter().filter(|v| v.as_str() != Some(path.as_str())).collect();
+    patch(&app, json!({ "watchFolders": list }));
 }
 
 /// 哪些已添加的演示文件现在找不到了(被移动或删除)
@@ -823,7 +604,12 @@ fn drag_end<R: Runtime>(app: AppHandle<R>) {
     let had = st(&app).inner.lock().unwrap().drag.take().is_some();
     if let (true, Some(w)) = (had, widget(&app)) {
         if let Ok(p) = w.outer_position() {
-            patch(&app, json!({ "x": p.x, "y": p.y }));
+            // 同时记住在当前屏幕上的位置,放映时跟随到别的屏幕再回来能回到原处
+            let mut pos = settings(&app)["screenPos"].as_object().cloned().unwrap_or_default();
+            if let Ok(Some(m)) = w.current_monitor() {
+                pos.insert(monitor_key((m.position().x, m.position().y, m.size().width as i32, m.size().height as i32)), json!([p.x, p.y]));
+            }
+            patch(&app, json!({ "x": p.x, "y": p.y, "screenPos": pos }));
         }
     }
 }
@@ -853,7 +639,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .invoke_handler(tauri::generate_handler![
-            get_settings, set_settings, reset_style, remove_link, check_files, send_cmd, send_toast, timer_state, show_menu,
+            get_settings, set_settings, reset_style, remove_link, check_files, rescan_folders, remove_folder, send_cmd, send_toast, timer_state, show_menu,
             open_settings_cmd, next_slide, platform_info, add_paths, pick_files, pick_folder, pick_config, pick_font,
             export_config, read_text, drag_start, drag_move, drag_end, resize
         ])
@@ -912,6 +698,11 @@ pub fn run() {
             if first_run {
                 open_settings(&handle);
             }
+            let hs = handle.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(2500));
+                rescan_folders_inner(&hs);
+            });
             if let Some(w) = load_warn {
                 let h = handle.clone();
                 std::thread::spawn(move || {
@@ -962,6 +753,7 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::files::scan_dir;
 
     #[test]
     fn folder_scan_finds_presentations() {

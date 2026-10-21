@@ -36,7 +36,9 @@ jobs:
           workspaces: src-tauri
       - run: npm ci
       - name: 运行测试
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: |
+          npm test
+          cargo test --manifest-path src-tauri/Cargo.toml
       - name: 打包
         uses: tauri-apps/tauri-action@v0
         env:

@@ -80,6 +80,7 @@ function showPage(name) {
   $('#pages').scrollTop = 0;
 }
 $('#nav').addEventListener('click', (e) => { const li = e.target.closest('li'); if (li) showPage(li.dataset.page); });
+$('#nav').addEventListener('keydown', (e) => { const li = e.target.closest('li'); if (li && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); showPage(li.dataset.page); } });
 
 // ---------- 绑定控件 ----------
 function fmtOut(el) {
@@ -147,6 +148,22 @@ function renderSegEditor(box, segs, onChange) {
   };
   box.appendChild(add);
 }
+
+// ---------- 监视的文件夹 ----------
+function renderWatch() {
+  const list = S.watchFolders || [], box = $('#watchList');
+  for (const id of ['#watchHead', '#watchList', '#watchHint']) $(id).hidden = !list.length;
+  box.innerHTML = '';
+  list.forEach((d) => {
+    const row = document.createElement('div');
+    row.className = 'row file';
+    row.innerHTML = '<div class="info"><div class="ic folder"><svg><use href="#i-folder"/></svg></div><div><div class="t"></div><div class="d">自动监视</div></div></div><button class="btn icon" title="不再监视" aria-label="不再监视"><svg><use href="#i-x"/></svg></button>';
+    row.querySelector('.t').textContent = d;
+    row.querySelector('button').onclick = () => api.send('remove_folder', { path: d });
+    box.appendChild(row);
+  });
+}
+async function rescan() { try { await api.invoke('rescan_folders'); } catch (e) { /* ignore */ } }
 
 // ---------- 演示文件列表 ----------
 let fileState = { missing: [], active: null }, openProfile = null;
@@ -220,6 +237,7 @@ function refresh() {
   $('#titleColor').disabled = !S.titleColor;
   for (const b of $$('#quick button')) b.classList.toggle('on', S.segments.length === 1 && S.segments[0].sec === Number(b.dataset.sec));
   if (!typing($('#fileList'))) renderFiles();
+  renderWatch();
 }
 
 document.addEventListener('input', (e) => {
@@ -400,10 +418,17 @@ api.on('toast', (m) => {
   clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 3200);
 });
 
+// ---------- 无障碍:没有标签的控件用所在行的标题命名 ----------
+for (const row of $$('.row')) {
+  const title = row.querySelector('.rl .t');
+  if (!title) continue;
+  for (const el of $$('input, select', row)) if (!el.getAttribute('aria-label')) el.setAttribute('aria-label', title.textContent.trim());
+}
+
 // ---------- 启动 ----------
 let lastFiles = '';
 api.on('settings', (s) => { S = s; refresh(); const k = JSON.stringify(s.linkFiles); if (k !== lastFiles) { lastFiles = k; refreshFileState(); } });
 initPreview();
 api.on('link', refreshFileState);
-window.addEventListener('focus', refreshFileState);
+window.addEventListener('focus', () => { rescan(); refreshFileState(); });
 initPlatform().then(() => api.getSettings()).then((s) => { S = s; lastFiles = JSON.stringify(s.linkFiles); refresh(); refreshFileState(); });
