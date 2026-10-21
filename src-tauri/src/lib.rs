@@ -4,6 +4,7 @@
 mod files;
 mod link;
 mod settings;
+mod update;
 
 use files::*;
 use settings::*;
@@ -534,7 +535,29 @@ fn next_slide<R: Runtime>(app: AppHandle<R>) {
 
 /// 平台信息:用于前端切换 Windows 11 / macOS 风格
 #[tauri::command]
-fn platform_info() -> Value {
+async fn check_update(app: AppHandle) -> Result<Value, String> {
+    let cur = app.package_info().version.to_string();
+    tauri::async_runtime::spawn_blocking(move || update::fetch_latest(&cur)).await.map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn install_update(app: AppHandle, url: String) -> Result<(), String> {
+    if !cfg!(windows) {
+        return Err("当前系统请到下载页手动安装".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || update::install(&app, &url)).await.map_err(|e| e.to_string())?
+}
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    update::open_url(&url)
+}
+
+#[tauri::command]
+fn platform_info<R: Runtime>(app: AppHandle<R>) -> Value {
+    let mut v = platform_info_inner();
+    v["version"] = json!(app.package_info().version.to_string());
+    v
+}
+fn platform_info_inner() -> Value {
     #[cfg(windows)]
     {
         let build = windows_build();
@@ -641,7 +664,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_settings, set_settings, reset_style, remove_link, check_files, rescan_folders, remove_folder, send_cmd, send_toast, timer_state, show_menu,
             open_settings_cmd, next_slide, platform_info, add_paths, pick_files, pick_folder, pick_config, pick_font,
-            export_config, read_text, drag_start, drag_move, drag_end, resize
+            export_config, read_text, check_update, install_update, open_url, drag_start, drag_move, drag_end, resize
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]
@@ -702,6 +725,20 @@ pub fn run() {
             std::thread::spawn(move || {
                 std::thread::sleep(Duration::from_millis(2500));
                 rescan_folders_inner(&hs);
+            });
+            // 启动后自动检查更新,有新版时提示一次(失败不打扰)
+            let hu = handle.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_secs(12));
+                if !settings(&hu).get("autoCheckUpdate").and_then(Value::as_bool).unwrap_or(true) {
+                    return;
+                }
+                let cur = hu.package_info().version.to_string();
+                if let Ok(r) = update::fetch_latest(&cur) {
+                    if r["newer"].as_bool() == Some(true) {
+                        toast(&hu, format!("发现新版本 {}(设置 → 关于 中更新)", r["latest"].as_str().unwrap_or("")));
+                    }
+                }
             });
             if let Some(w) = load_warn {
                 let h = handle.clone();

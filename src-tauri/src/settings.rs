@@ -35,6 +35,8 @@ pub(crate) fn defaults() -> Value {
         "prevPage": "none",
         // 到时后继续计时并显示超时(-00:12)
         "overtime": false,
+        // 启动时自动检查 GitHub 上是否有新版本
+        "autoCheckUpdate": true,
         // 每个演示文件单独的计时方案:{ "路径": { "segments": [...], "loop": false } }
         "fileProfiles": {},
         "hotkeys": { "toggle": "Ctrl+Alt+S", "reset": "Ctrl+Alt+R", "show": "Ctrl+Alt+H", "through": "Ctrl+Alt+T", "next": "Ctrl+Alt+N" }

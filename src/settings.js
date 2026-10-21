@@ -46,6 +46,7 @@ async function initPlatform() {
   html.classList.toggle('material', !!(P.mica || P.os === 'macos'));
   applyTheme();
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+  $('#ver').textContent = '版本 ' + (P.version || '') + ' · Tauri';
   fillFonts();
   $('#linkUnsupported').hidden = P.linkSupported !== false;
   if (P.os === 'macos') $('#tipTray').textContent = '隐藏或穿透后,可在屏幕顶部菜单栏图标找回:左键显示/隐藏,右键菜单';
@@ -513,6 +514,35 @@ window.addEventListener('blur', closeDd);
 window.addEventListener('resize', closeDd);
 $('#pages').addEventListener('scroll', closeDd);
 for (const sel of $$('select')) enhanceSelect(sel);
+
+// ---------- 关于:检查更新、外部链接 ----------
+let updInfo = null;
+async function checkUpdate() {
+  const btn = $('#btnUpdate'), row = $('#updRow');
+  btn.disabled = true; btn.textContent = '检查中…';
+  try {
+    const r = await api.invoke('check_update');
+    updInfo = r; row.hidden = false;
+    const canInstall = P.os === 'windows' && r.newer && r.asset;
+    $('#btnInstall').hidden = !canInstall;
+    $('#btnPage').hidden = !r.newer || canInstall;
+    $('#updTitle').textContent = r.newer ? `发现新版本 ${r.latest}` : '已是最新版本';
+    $('#updNotes').textContent = r.newer ? (r.notes || '').trim().slice(0, 300) || `当前 ${r.current}` : `当前版本 ${r.current}`;
+    if (r.newer && !canInstall) $('#btnPage').hidden = false;
+  } catch (e) {
+    row.hidden = false; $('#btnInstall').hidden = true; $('#btnPage').hidden = true;
+    $('#updTitle').textContent = '检查更新失败'; $('#updNotes').textContent = String(e);
+  }
+  btn.disabled = false; btn.textContent = '检查更新';
+}
+$('#btnUpdate').onclick = checkUpdate;
+$('#btnPage').onclick = () => updInfo && api.send('open_url', { url: updInfo.page });
+$('#btnInstall').onclick = async () => {
+  const b = $('#btnInstall'); b.disabled = true; b.textContent = '下载中…';
+  try { await api.invoke('install_update', { url: updInfo.asset }); b.textContent = '正在启动安装程序…'; }
+  catch (e) { b.disabled = false; b.textContent = '立即更新'; $('#updNotes').textContent = String(e); }
+};
+document.addEventListener('click', (e) => { const b = e.target.closest('[data-url]'); if (b) api.send('open_url', { url: b.dataset.url }); });
 
 // ---------- 启动 ----------
 let lastFiles = '';

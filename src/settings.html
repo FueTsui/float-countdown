@@ -211,7 +211,15 @@
     <!-- ================= 关于 ================= -->
     <section class="page" id="p-about">
       <div class="group">
-        <div class="row"><div class="rl"><div class="t">悬浮倒计时</div><div class="d" id="ver">版本 2.0.0 · Tauri</div></div></div>
+        <div class="row"><div class="rl"><div class="t">悬浮倒计时</div><div class="d" id="ver">版本</div></div><div class="rc"><button class="btn" id="btnUpdate">检查更新</button></div></div>
+        <div class="row" id="updRow" hidden><div class="rl"><div class="t" id="updTitle"></div><div class="d" id="updNotes"></div></div><div class="rc"><button class="btn accent" id="btnInstall">立即更新</button><button class="btn" id="btnPage">查看发布页</button></div></div>
+        <div class="row"><div class="rl"><div class="t">启动时自动检查更新</div><div class="d">有新版本时在悬浮窗提示一次</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="autoCheckUpdate"><i></i></label></div></div>
+      </div>
+      <h2>作者</h2>
+      <div class="group">
+        <div class="row"><div class="rl"><div class="t">© 2026 FueTsui</div><div class="d">保留所有权利</div></div></div>
+        <div class="row"><div class="rl"><div class="t">主页</div><div class="d">fuetsui.com</div></div><div class="rc"><button class="btn" data-url="https://fuetsui.com">打开</button></div></div>
+        <div class="row"><div class="rl"><div class="t">GitHub</div><div class="d">github.com/FueTsui/float-countdown</div></div><div class="rc"><button class="btn" data-url="https://github.com/FueTsui/float-countdown">打开</button></div></div>
       </div>
       <h2>使用小技巧</h2>
       <div class="group">
