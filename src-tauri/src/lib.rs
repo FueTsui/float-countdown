@@ -213,16 +213,16 @@ pub fn move_widget_to_monitor<R: Runtime>(app: &AppHandle<R>, rect: (i32, i32, i
     let _ = w.set_position(PhysicalPosition::new(x, y));
 }
 
-/// 显示悬浮窗但不抢焦点
+/// 显示悬浮窗但不抢焦点。
+/// 必须用 w.show() 而不是直接调 ShowWindow:窗口库自己记着“是否可见”,不同步的话,
+/// 之后切换点击穿透/置顶等任何窗口属性时,它会按旧状态把窗口重新隐藏(悬浮窗“自己消失”)。
+/// 悬浮窗创建时设了 focusable(false),所以 show() 不会激活窗口。
 fn show_inactive<R: Runtime>(w: &WebviewWindow<R>) {
-    #[cfg(windows)]
-    {
-        if let Ok(h) = w.hwnd() {
-            link::show_no_activate(h.0 as isize);
-            return;
-        }
-    }
     let _ = w.show();
+    #[cfg(windows)]
+    if let Ok(h) = w.hwnd() {
+        link::bring_topmost(h.0 as isize);
+    }
 }
 
 pub fn update_visibility<R: Runtime>(app: &AppHandle<R>) {
@@ -690,13 +690,11 @@ pub fn run() {
             }
             let handle = app.handle().clone();
             let file = app.path().app_config_dir()?.join("settings.json");
-            let first_run = !file.exists();
-            // 第一次运行时沿用旧版(Electron)的设置
-            let old = app.path().config_dir().map(|d| d.join("float-countdown").join("settings.json"));
-            let load_from = match old {
-                Ok(o) if first_run && o.exists() => o,
-                _ => file.clone(),
-            };
+            // 第一次运行时沿用旧版的设置:先找改名前的标识(com.dario.floatcountdown),再找 Electron 版
+            let old = app.path().config_dir().map(|d| [d.join("com.dario.floatcountdown"), d.join("float-countdown")].map(|p| p.join("settings.json")));
+            let migrate = if file.exists() { None } else { old.ok().and_then(|c| c.into_iter().find(|p| p.exists())) };
+            let first_run = !file.exists() && migrate.is_none();
+            let load_from = migrate.unwrap_or_else(|| file.clone());
             let (loaded, load_warn) = load_settings(&load_from);
             app.manage(AppState {
                 inner: Mutex::new(Inner {

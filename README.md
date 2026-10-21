@@ -62,4 +62,4 @@ Windows 上也可以直接双击 `构建安装包.bat`。
 
 - **演示联动只支持 Windows**。macOS 上可以添加演示文件,但不会自动检测放映和翻页(需要额外的辅助功能权限,后续可以再做)。
 - macOS 版没有在真机上测试过,首次打开如果提示“无法验证开发者”,请在「系统设置 → 隐私与安全性」里点「仍要打开」。
-- 设置保存在 `%APPDATA%\com.dario.floatcountdown\settings.json`(macOS 在 `~/Library/Application Support/com.dario.floatcountdown/`)。第一次运行时会自动沿用旧版的设置。
+- 设置保存在 `%APPDATA%\com.fuetsui.floatcountdown\settings.json`(macOS 在 `~/Library/Application Support/com.fuetsui.floatcountdown/`)。第一次运行时会自动沿用旧版的设置。

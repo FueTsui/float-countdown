@@ -99,8 +99,8 @@ mod win {
         VIRTUAL_KEY, VK_RIGHT,
     };
     use windows::Win32::UI::WindowsAndMessaging::{
-        GetForegroundWindow, GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, SetWindowPos, ShowWindow,
-        HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SW_SHOWNOACTIVATE,
+        GetForegroundWindow, GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, SetWindowPos,
+        HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
     };
 
     pub struct Fg {
@@ -151,14 +151,6 @@ mod win {
         }
     }
 
-    pub fn show_no_activate(h: isize) {
-        unsafe {
-            let h = HWND(h as *mut _);
-            let _ = ShowWindow(h, SW_SHOWNOACTIVATE);
-            let _ = SetWindowPos(h, Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-        }
-    }
-
     pub fn bring_topmost(h: isize) {
         unsafe {
             let _ = SetWindowPos(HWND(h as *mut _), Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
@@ -174,7 +166,7 @@ mod win {
 }
 
 #[cfg(windows)]
-pub use win::{accent_color, bring_topmost, show_no_activate};
+pub use win::{accent_color, bring_topmost};
 
 pub fn send_right_key() {
     #[cfg(windows)]

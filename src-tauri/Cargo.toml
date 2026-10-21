@@ -1,7 +1,8 @@
 [package]
 name = "float-countdown"
-version = "2.2.0"
+version = "2.2.1"
 description = "悬浮倒计时"
+authors = ["Fue Tsui"]
 edition = "2021"
 
 [lib]

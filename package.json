@@ -1,6 +1,6 @@
 {
   "name": "float-countdown",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "private": true,
   "description": "悬浮倒计时 (Tauri 版)",
   "scripts": {
