@@ -21,6 +21,9 @@
   <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
   <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></symbol>
   <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M6 14l6-6 6 6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 10l6 6 6-6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></symbol>
 </svg>
 
@@ -57,10 +60,13 @@
       <h2>环节列表</h2>
       <div class="group">
         <div class="row block">
-          <div class="rl"><div class="t">每行一个环节:名称 + 时长</div>
-            <div class="d">例如 <code>题库 8秒</code>、<code>答题 1分30秒</code>、<code>休息 2:00</code>、<code>45</code>(纯数字=秒)。按 Ctrl+Enter 快速应用。</div></div>
-          <textarea id="segText" rows="6" spellcheck="false"></textarea>
-          <div class="btns"><button class="btn accent" id="applyText">应用环节</button><span class="note" id="note"></span></div>
+          <div class="rl"><div class="t">默认环节 <span class="count" id="segTotal"></span></div>
+            <div class="d">按顺序依次计时。时长可以写 <code>8秒</code>、<code>1分30秒</code>、<code>2:00</code>,纯数字表示秒。</div></div>
+          <div class="seglist" id="segList"></div>
+          <details class="bulk"><summary>批量编辑(整段文本粘贴)</summary>
+            <textarea id="segText" rows="6" spellcheck="false" placeholder="每行一个环节,例如:题库 8秒"></textarea>
+            <div class="btns"><button class="btn accent" id="applyText">应用文本</button><span class="note" id="note"></span></div>
+          </details>
         </div>
         <div class="row block">
           <div class="rl"><div class="t">快捷设为单个计时</div></div>
@@ -75,6 +81,7 @@
       <div class="group">
         <div class="row"><div class="rl"><div class="t">自动进入下一环节</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="autoNext"><i></i></label></div></div>
         <div class="row"><div class="rl"><div class="t">循环</div><div class="d">最后一个环节结束后回到第一个</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="loop"><i></i></label></div></div>
+        <div class="row"><div class="rl"><div class="t">到时后继续计时</div><div class="d">时间到后显示已超时多久,例如 -00:12</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="overtime"><i></i></label></div></div>
         <div class="row"><div class="rl"><div class="t">结束时显示</div><div class="d">留空则显示 00:00</div></div><div class="rc"><input type="text" class="w180" data-k="endText"></div></div>
       </div>
 
@@ -168,7 +175,8 @@
         <div class="row"><div class="rl"><div class="t">仅全屏放映时生效</div><div class="d">关闭则在编辑窗口里打开也算</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="linkOnlyFullscreen"><i></i></label></div></div>
         <div class="row"><div class="rl"><div class="t">仅放映时显示悬浮窗</div><div class="d">其余时间自动隐藏</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="linkShow"><i></i></label></div></div>
         <div class="row"><div class="rl"><div class="t">放映时自动开始</div><div class="d">退出放映时自动重置</div></div><div class="rc"><label class="switch"><input type="checkbox" data-k="linkAutoStart"><i></i></label></div></div>
-        <div class="row"><div class="rl"><div class="t">翻页时</div></div><div class="rc"><select data-k="pageTurn"><option value="restart">重新开始计时(每页限时)</option><option value="none">不处理</option></select></div></div>
+        <div class="row"><div class="rl"><div class="t">向后翻页时</div><div class="d">→ ↓ PgDn 空格 回车 鼠标点击</div></div><div class="rc"><select data-k="pageTurn"><option value="restart">重新开始计时(每页限时)</option><option value="none">不处理</option></select></div></div>
+        <div class="row"><div class="rl"><div class="t">向前翻页时</div><div class="d">← ↑ PgUp</div></div><div class="rc"><select data-k="prevPage"><option value="none">不处理</option><option value="restart">重新开始计时</option></select></div></div>
         <div class="row"><div class="rl"><div class="t">计时结束自动翻页</div></div><div class="rc"><input type="number" data-k="autoPageDelay" min="0" max="10000" step="100"><span class="unit">毫秒后</span><label class="switch"><input type="checkbox" data-k="autoPage"><i></i></label></div></div>
       </div>
     </section>

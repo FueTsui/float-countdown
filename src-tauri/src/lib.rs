@@ -52,6 +52,12 @@ fn defaults() -> Value {
         "locked": false, "clickThrough": false, "alwaysOnTop": true, "snap": true, "autoLaunch": false,
         "linkFiles": [], "linkOnlyFullscreen": true, "linkShow": false, "linkAutoStart": true, "pageTurn": "restart",
         "autoPage": false, "autoPageDelay": 1000, "scanSubfolders": true,
+        // 向前翻页:none 不处理 / restart 重新计时
+        "prevPage": "none",
+        // 到时后继续计时并显示超时(-00:12)
+        "overtime": false,
+        // 每个演示文件单独的计时方案:{ "路径": { "segments": [...], "loop": false } }
+        "fileProfiles": {},
         "hotkeys": { "toggle": "Ctrl+Alt+S", "reset": "Ctrl+Alt+R", "show": "Ctrl+Alt+H", "through": "Ctrl+Alt+T", "next": "Ctrl+Alt+N" }
     })
 }
@@ -690,13 +696,30 @@ fn reset_style<R: Runtime>(app: AppHandle<R>) {
     patch(&app, Value::Object(o));
 }
 #[tauri::command]
-fn remove_link<R: Runtime>(app: AppHandle<R>, index: Option<usize>) {
+fn remove_link<R: Runtime>(app: AppHandle<R>, path: Option<String>) {
     let s = settings(&app);
-    let list: Vec<Value> = match index {
-        Some(i) => s["linkFiles"].as_array().cloned().unwrap_or_default().into_iter().enumerate().filter(|(j, _)| *j != i).map(|(_, v)| v).collect(),
-        None => vec![],
+    // 按路径移除(而不是按序号),两个窗口同时操作也不会删错
+    let (list, mut profiles) = match &path {
+        Some(p) => (
+            s["linkFiles"].as_array().cloned().unwrap_or_default().into_iter().filter(|v| v.as_str() != Some(p.as_str())).collect::<Vec<_>>(),
+            s["fileProfiles"].as_object().cloned().unwrap_or_default(),
+        ),
+        None => (vec![], Map::new()),
     };
-    patch(&app, json!({ "linkFiles": list }));
+    if let Some(p) = &path {
+        profiles.remove(p);
+    } else {
+        profiles.clear();
+    }
+    patch(&app, json!({ "linkFiles": list, "fileProfiles": profiles }));
+}
+
+/// 哪些已添加的演示文件现在找不到了(被移动或删除)
+#[tauri::command]
+fn check_files<R: Runtime>(app: AppHandle<R>) -> Value {
+    let s = settings(&app);
+    let missing: Vec<&str> = s["linkFiles"].as_array().map(|a| a.iter().filter_map(Value::as_str).filter(|p| !Path::new(p).exists()).collect()).unwrap_or_default();
+    json!({ "missing": missing, "active": st(&app).inner.lock().unwrap().link_file })
 }
 #[tauri::command]
 fn send_cmd<R: Runtime>(app: AppHandle<R>, c: String) {
@@ -830,7 +853,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .invoke_handler(tauri::generate_handler![
-            get_settings, set_settings, reset_style, remove_link, send_cmd, send_toast, timer_state, show_menu,
+            get_settings, set_settings, reset_style, remove_link, check_files, send_cmd, send_toast, timer_state, show_menu,
             open_settings_cmd, next_slide, platform_info, add_paths, pick_files, pick_folder, pick_config, pick_font,
             export_config, read_text, drag_start, drag_move, drag_end, resize
         ])

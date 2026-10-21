@@ -7,7 +7,13 @@ const stage = $('stage'), box = $('box'), elTitle = $('title'), elLabel = $('lab
 const T = { state: 'idle', idx: 0, endAt: 0, remain: 0, total: 0, toast: '', toastUntil: 0 };
 let segKey = null, fontLoaded = '', maxBox = 0, lastText = null, lastLabel = null, lastWarn = null, lastSec = -1, lastPct = -1, flashT = 0;
 const now = () => performance.now();
-const segs = () => (S.segments && S.segments.length ? S.segments : [{ name: '', sec: 60 }]);
+// 放映联动命中某个文件、且给它设了专属方案时,用专属方案;否则用默认环节
+let profile = null;
+const segs = () => {
+  const l = profile && profile.segments && profile.segments.length ? profile.segments : S.segments;
+  return l && l.length ? l : [{ name: '', sec: 60 }];
+};
+const loopOn = () => (profile && typeof profile.loop === 'boolean' ? profile.loop : S.loop);
 
 // ---------- 样式 ----------
 function hexA(h, a) {
@@ -35,7 +41,7 @@ function styleText(warn) {
   box.style.textShadow = sh.join(',') || 'none';
 }
 function apply() {
-  const key = JSON.stringify(S.segments);
+  const key = JSON.stringify(segs());
   if (key !== segKey) { segKey = key; enterSeg(0); setState('idle'); }
   const a = Number(S.bgOpacity);
   box.style.background = S.bgStyle === 'none' ? 'transparent'
@@ -100,7 +106,7 @@ function jump(d) {
   if (was) T.endAt = now() + T.remain; else setState('idle');
 }
 function finish() {
-  T.remain = 0; setState('finished');
+  T.remain = 0; T.finishedAt = now(); setState('finished');
   if (S.flashOnEnd) { box.classList.add('flash'); flashT = setTimeout(clearFlash, 5200); }
   endBeep();
   if (S.autoPage) {
@@ -117,8 +123,8 @@ function tick() {
     const list = segs();
     while (rem <= 0) {
       if (S.autoNext && T.idx < list.length - 1) { enterSeg(T.idx + 1); T.endAt += T.total; rem = T.endAt - now(); lastSec = -1; continue; }
-      if (S.autoNext && S.loop) { enterSeg(0); T.endAt += T.total; rem = T.endAt - now(); lastSec = -1; continue; }
-      if (!S.autoNext && S.loop && list.length === 1) { enterSeg(0); T.endAt += T.total; rem = T.endAt - now(); continue; }
+      if (S.autoNext && loopOn()) { enterSeg(0); T.endAt += T.total; rem = T.endAt - now(); lastSec = -1; continue; }
+      if (!S.autoNext && loopOn() && list.length === 1) { enterSeg(0); T.endAt += T.total; rem = T.endAt - now(); continue; }
       finish(); break;
     }
     if (T.state === 'running' && S.tickBeep) {
@@ -140,11 +146,17 @@ function fmt(ms) {
   if (tf === 'hh:mm:ss' || (tf === 'auto' && h > 0)) return `${h}:${p(m)}:${p(s % 60)}`;
   return `${p(Math.floor(s / 60))}:${p(s % 60)}`;
 }
+function fmtUp(ms) {
+  const s = Math.floor(Math.max(0, ms) / 1000), p = (n) => String(n).padStart(2, '0');
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  return h > 0 ? `${h}:${p(m)}:${p(s % 60)}` : `${p(m)}:${p(s % 60)}`;
+}
 function render(force) {
   const t = now(), list = segs();
   const rem = T.state === 'running' ? T.endAt - t : T.remain;
   const fin = T.state === 'finished';
-  const text = fin ? (S.endText || fmt(0)) : fmt(rem);
+  // 到时后:开启“显示超时”则继续往上数(-00:12),否则显示结束文字
+  const text = fin ? (S.overtime ? '-' + fmtUp(t - T.finishedAt) : (S.endText || fmt(0))) : fmt(rem);
   if (text !== lastText || force) { elTime.textContent = text; lastText = text; }
   const toasting = t < T.toastUntil;
   let lab = '';
@@ -211,13 +223,18 @@ new ResizeObserver(() => {
 }).observe(stage);
 
 // ---------- 来自主进程 ----------
-const CMD = { toggle, start, pause, reset, next: () => jump(1), prev: () => jump(-1), first: goFirst, pageturn: () => { goFirst(); start(); } };
+const CMD = { toggle, start, pause, reset, next: () => jump(1), prev: () => jump(-1), first: goFirst, pageturn: () => { goFirst(); start(); }, pageprev: () => { goFirst(); start(); } };
 api.on('cmd', (c) => { if (S && CMD[c]) CMD[c](); });
 api.on('toast', toast);
 api.on('settings', (s) => { S = s; apply(); });
 api.on('link', (p) => {
-  const a = typeof p === 'object' && p ? p.active : !!p;
-  if (!S || !S.linkAutoStart) return;
+  const a = !!(p && p.active), file = p && p.file;
+  if (!S) return;
+  // 切换到该文件专属的计时方案(没有就用默认)
+  profile = a && file && S.fileProfiles && S.fileProfiles[file] ? S.fileProfiles[file] : null;
+  if (a && file) toast('联动: ' + file.split(/[\\/]/).pop());
+  apply();
+  if (!S.linkAutoStart) return;
   if (a) { goFirst(); start(); } else { goFirst(); }
 });
 Promise.all([api.getSettings(), api.platform().catch(() => ({ os: 'windows' }))]).then(([s, p]) => {

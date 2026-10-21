@@ -209,10 +209,13 @@ fn poll_loop<R: Runtime>(app: AppHandle<R>) {
         let active = app.state::<AppState>().inner.lock().unwrap().link_active;
         for (j, &k) in KEYS.iter().enumerate() {
             let d = win::key_down(k);
-            if d && !down[j] && active && s["pageTurn"].as_str() == Some("restart") {
-                if on_key(&app, k) && last_turn.elapsed() >= Duration::from_millis(200) {
+            if d && !down[j] && active && on_key(&app, k) && last_turn.elapsed() >= Duration::from_millis(200) {
+                // 向前翻页:左 / 上 / PgUp / P;其余按键和鼠标左键算向后翻页
+                let back = matches!(k, 37 | 38 | 33 | 80);
+                let mode = s[if back { "prevPage" } else { "pageTurn" }].as_str().unwrap_or("none");
+                if mode != "none" {
                     last_turn = Instant::now();
-                    cmd(&app, "pageturn");
+                    cmd(&app, if back { "pageprev" } else { "pageturn" });
                 }
             }
             down[j] = d;

@@ -81,23 +81,100 @@ function kindOf(p) {
 }
 function dirOf(p) { const i = Math.max(p.lastIndexOf('\\'), p.lastIndexOf('/')); return i > 0 ? p.slice(0, i) : ''; }
 
+// ---------- 环节列表编辑器(默认环节和文件专属环节共用) ----------
+const totalText = (segs) => { const s = segs.reduce((a, x) => a + x.sec, 0); return s ? '共 ' + window.CDParse.fmtDur(s) : ''; };
+function renderSegEditor(box, segs, onChange) {
+  box.innerHTML = '';
+  const list = segs.length ? segs : [{ name: '', sec: 60 }];
+  const emit = () => {
+    const rows = [...box.querySelectorAll('.seg')];
+    const out = [];
+    let bad = false;
+    rows.forEach((r) => {
+      const sec = window.CDParse.parseDuration(r.querySelector('.sd').value);
+      r.classList.toggle('bad', sec == null);
+      if (sec == null) { bad = true; return; }
+      out.push({ name: r.querySelector('.sn').value.trim(), sec });
+    });
+    if (!bad && out.length) onChange(out);
+  };
+  list.forEach((sg, i) => {
+    const r = document.createElement('div');
+    r.className = 'seg';
+    r.innerHTML = '<span class="idx"></span><input class="sn" type="text" placeholder="名称(可留空)" aria-label="环节名称"><input class="sd" type="text" placeholder="时长" aria-label="时长"><button class="btn icon" data-a="up" title="上移" aria-label="上移"><svg><use href="#i-up"/></svg></button><button class="btn icon" data-a="down" title="下移" aria-label="下移"><svg><use href="#i-down"/></svg></button><button class="btn icon" data-a="del" title="删除" aria-label="删除"><svg><use href="#i-x"/></svg></button>';
+    r.querySelector('.idx').textContent = i + 1;
+    r.querySelector('.sn').value = sg.name || '';
+    r.querySelector('.sd').value = window.CDParse.fmtDur(sg.sec);
+    r.addEventListener('input', emit);
+    r.addEventListener('click', (e) => {
+      const a = e.target.closest('button') && e.target.closest('button').dataset.a;
+      if (!a) return;
+      const cur = [...box.querySelectorAll('.seg')].map((x) => ({ name: x.querySelector('.sn').value.trim(), sec: window.CDParse.parseDuration(x.querySelector('.sd').value) || sg.sec }));
+      if (a === 'del') cur.splice(i, 1);
+      else if (a === 'up' && i > 0) [cur[i - 1], cur[i]] = [cur[i], cur[i - 1]];
+      else if (a === 'down' && i < cur.length - 1) [cur[i + 1], cur[i]] = [cur[i], cur[i + 1]];
+      onChange(cur.length ? cur : [{ name: '', sec: 60 }]);
+    });
+    box.appendChild(r);
+  });
+  const add = document.createElement('button');
+  add.className = 'btn';
+  add.innerHTML = '<svg><use href="#i-plus"/></svg><span>添加环节</span>';
+  add.onclick = () => {
+    const cur = [...box.querySelectorAll('.seg')].map((x) => ({ name: x.querySelector('.sn').value.trim(), sec: window.CDParse.parseDuration(x.querySelector('.sd').value) || 60 }));
+    cur.push({ name: '', sec: cur.length ? cur[cur.length - 1].sec : 60 });
+    onChange(cur);
+  };
+  box.appendChild(add);
+}
+
+// ---------- 演示文件列表 ----------
+let fileState = { missing: [], active: null }, openProfile = null;
+async function refreshFileState() { try { fileState = await api.invoke('check_files'); } catch (e) { /* ignore */ } renderFiles(); }
+
 function renderFiles() {
   const box = $('#fileList');
   box.innerHTML = '';
   $('#fileCount').textContent = S.linkFiles.length ? `(${S.linkFiles.length})` : '';
   $('#btnClear').hidden = !S.linkFiles.length;
   if (!S.linkFiles.length) { box.innerHTML = '<div class="row empty">还没有添加演示文件</div>'; return; }
-  S.linkFiles.forEach((f, i) => {
+  S.linkFiles.forEach((f) => {
     const [k, label] = kindOf(f);
+    const missing = fileState.missing.includes(f), active = fileState.active === f;
+    const prof = (S.fileProfiles || {})[f];
+    const wrap = document.createElement('div');
+    wrap.className = 'filewrap' + (active ? ' active' : '');
     const row = document.createElement('div');
-    row.className = 'row file';
-    row.innerHTML = `<div class="info"><div class="ic ${k}"></div><div><div class="t"></div><div class="d"></div></div></div><button class="btn icon" title="移除"><svg><use href="#i-x"/></svg></button>`;
-    row.querySelector('.ic').textContent = label;
+    row.className = 'row file' + (missing ? ' missing' : '');
+    row.innerHTML = '<div class="info"><div class="ic"></div><div><div class="t"></div><div class="d"></div></div></div><span class="badge"></span><button class="btn" data-a="prof"></button><button class="btn icon" data-a="rm" title="移除" aria-label="移除"><svg><use href="#i-x"/></svg></button>';
+    const ic = row.querySelector('.ic'); ic.textContent = label; ic.classList.add(k);
     row.querySelector('.t').textContent = baseName(f);
-    row.querySelector('.d').textContent = dirOf(f);
+    row.querySelector('.d').textContent = missing ? '找不到文件,可能已被移动或删除 · ' + dirOf(f) : dirOf(f);
+    row.querySelector('.badge').textContent = active ? '正在放映' : missing ? '找不到' : '';
+    row.querySelector('.badge').hidden = !(active || missing);
+    const pb = row.querySelector('[data-a=prof]');
+    pb.textContent = prof ? '专属计时 · ' + prof.segments.length + ' 个环节' : '使用默认计时';
+    pb.classList.toggle('on', !!prof);
     row.title = f;
-    row.querySelector('button').onclick = () => api.send('remove_link', { index: i });
-    box.appendChild(row);
+    row.addEventListener('click', (e) => {
+      const a = e.target.closest('button') && e.target.closest('button').dataset.a;
+      if (a === 'rm') api.send('remove_link', { path: f });
+      if (a === 'prof') { openProfile = openProfile === f ? null : f; renderFiles(); }
+    });
+    wrap.appendChild(row);
+    if (openProfile === f) {
+      const ed = document.createElement('div');
+      ed.className = 'profile';
+      ed.innerHTML = '<div class="d">放映这个文件时自动使用下面的环节(例如题库每页 8 秒,汇报整体 10 分钟)。</div><div class="seglist"></div><div class="btns"><label class="inl"><span class="switch"><input type="checkbox" class="pl"><i></i></span> 循环</label><button class="btn subtle" data-a="clear">改用默认计时</button></div>';
+      const cur = prof || { segments: JSON.parse(JSON.stringify(S.segments)), loop: S.loop };
+      const save = (segments) => api.set({ fileProfiles: { ...(S.fileProfiles || {}), [f]: { ...cur, segments } } });
+      renderSegEditor(ed.querySelector('.seglist'), cur.segments, save);
+      const pl = ed.querySelector('.pl'); pl.checked = !!cur.loop;
+      pl.onchange = () => api.set({ fileProfiles: { ...(S.fileProfiles || {}), [f]: { ...cur, loop: pl.checked } } });
+      ed.querySelector('[data-a=clear]').onclick = () => { const p = { ...(S.fileProfiles || {}) }; delete p[f]; api.set({ fileProfiles: p }); openProfile = null; };
+      wrap.appendChild(ed);
+    }
+    box.appendChild(wrap);
   });
 }
 
@@ -111,13 +188,17 @@ function refresh() {
   }
   for (const el of $$('[data-hk]')) el.value = S.hotkeys[el.dataset.hk] || '';
   if (document.activeElement !== $('#segText')) $('#segText').value = window.CDParse.segmentsToText(S.segments);
+  const typing = (box) => document.activeElement && document.activeElement.tagName === 'INPUT' && box.contains(document.activeElement);
+  if (!typing($('#segList'))) renderSegEditor($('#segList'), S.segments, (segments) => api.set({ segments }));
+  $('#segTotal').textContent = totalText(S.segments);
+  renderPreview();
   $('#fontName').textContent = S.fontFile ? baseName(S.fontFile) : '未选择';
   $('#btnFontClear').hidden = !S.fontFile;
   $('#titleColorOn').checked = !!S.titleColor;
   $('#titleColor').value = S.titleColor || S.textColor || '#ffffff';
   $('#titleColor').disabled = !S.titleColor;
   for (const b of $$('#quick button')) b.classList.toggle('on', S.segments.length === 1 && S.segments[0].sec === Number(b.dataset.sec));
-  renderFiles();
+  if (!typing($('#fileList'))) renderFiles();
 }
 
 document.addEventListener('input', (e) => {
@@ -176,7 +257,7 @@ $('#btnResetStyle').onclick = () => api.send('reset_style');
 // 全部移除:再点一次确认(不会删除文件本身)
 $('#btnClear').onclick = (e) => {
   const b = e.currentTarget;
-  if (b.dataset.armed) { delete b.dataset.armed; b.textContent = '全部移除'; api.send('remove_link', { index: null }); return; }
+  if (b.dataset.armed) { delete b.dataset.armed; b.textContent = '全部移除'; api.send('remove_link', { path: null }); return; }
   b.dataset.armed = '1'; b.textContent = '再点一次确认移除';
   setTimeout(() => { delete b.dataset.armed; b.textContent = '全部移除'; }, 3000);
 };
@@ -232,6 +313,65 @@ for (const el of $$('[data-hk]')) {
   });
 }
 
+// ---------- 实时预览 ----------
+const PV_BG = { dark: '#2b2d31', light: '#e9ecf1', slide: 'linear-gradient(135deg,#f4f4f4,#bcc6d6)' };
+let pvBg = 'dark';
+function hexA(h, a) {
+  h = String(h || '#000').replace('#', '');
+  if (h.length === 3) h = [...h].map((c) => c + c).join('');
+  const n = parseInt(h, 16) || 0;
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+function initPreview() {
+  for (const id of ['p-look', 'p-title']) {
+    const card = document.createElement('div');
+    card.className = 'pvcard';
+    card.innerHTML = '<div class="pvhead"><span>实时预览</span><span class="seg-ctl" role="group" aria-label="预览背景"><button data-bg="dark" class="on">深色</button><button data-bg="light">浅色</button><button data-bg="slide">幻灯片</button></span></div><div class="pvstage"><div class="pvbox"><div class="pvtitle"></div><div class="pvlabel"></div><div class="pvtime">01:00</div><div class="pvbar"><i></i></div></div></div>';
+    $('#' + id).prepend(card);
+    card.querySelector('.seg-ctl').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { pvBg = b.dataset.bg; renderPreview(); } });
+  }
+}
+function renderPreview() {
+  if (!S) return;
+  const first = S.segments[0] || { sec: 60, name: '' };
+  const scale = 0.62; // 预览按比例缩小
+  const fs = Math.min(S.fontSize, 140) * scale;
+  const sec = first.sec, p = (n) => String(n).padStart(2, '0');
+  const time = S.timeFormat === 'sec' ? String(sec) : sec >= 3600 && S.timeFormat !== 'mm:ss' ? `${Math.floor(sec / 3600)}:${p(Math.floor(sec % 3600 / 60))}:${p(sec % 60)}` : `${p(Math.floor(sec / 60))}:${p(sec % 60)}`;
+  for (const card of $$('.pvcard')) {
+    card.querySelector('.pvstage').style.background = PV_BG[pvBg];
+    $$('.seg-ctl button', card).forEach((b) => b.classList.toggle('on', b.dataset.bg === pvBg));
+    const box = card.querySelector('.pvbox'), a = Number(S.bgOpacity);
+    box.style.background = S.bgStyle === 'none' ? 'transparent' : S.bgStyle === 'gradient' ? `linear-gradient(135deg, ${hexA(S.bgColor, a)}, ${hexA(S.bgColor2, a)})` : hexA(S.bgColor, a);
+    box.style.borderRadius = S.radius * scale + 'px';
+    box.style.border = S.borderWidth > 0 ? `${Math.max(1, S.borderWidth * scale)}px solid ${S.borderColor}` : 'none';
+    box.style.boxShadow = S.shadow && S.bgStyle !== 'none' ? '0 4px 14px rgba(0,0,0,.35)' : 'none';
+    box.style.padding = `${S.padY * scale}px ${S.padX * scale}px`;
+    box.style.color = S.textColor;
+    box.style.fontWeight = S.fontWeight;
+    box.style.fontFamily = S.fontFamily ? `"${S.fontFamily}", ` + (P.os === 'macos' ? '-apple-system, sans-serif' : '"Segoe UI Variable Display", "Segoe UI", sans-serif') : (P.os === 'macos' ? '-apple-system, "SF Pro Display", "PingFang SC", sans-serif' : '"Segoe UI Variable Display", Bahnschrift, "Segoe UI", "Microsoft YaHei UI", sans-serif');
+    const sh = [];
+    if (S.textShadow) sh.push('0 2px 8px rgba(0,0,0,.65)');
+    if (S.glow) sh.push(`0 0 8px ${S.textColor}`, `0 0 20px ${S.textColor}`);
+    box.style.textShadow = sh.join(',') || 'none';
+    box.style.opacity = Math.min(1, Math.max(0.2, Number(S.windowOpacity) || 1));
+    const t = box.querySelector('.pvtitle'), title = (S.titleText || '').trim();
+    t.textContent = title; t.style.display = S.showTitle && title ? '' : 'none';
+    t.style.fontSize = Math.max(10, fs * (Number(S.titleScale) || 0.34)) + 'px';
+    t.style.color = S.titleColor || '';
+    const l = box.querySelector('.pvlabel');
+    l.textContent = first.name ? first.name + (S.segments.length > 1 ? ` (1/${S.segments.length})` : '') : '';
+    l.style.display = S.showLabel && l.textContent ? '' : 'none';
+    l.style.fontSize = Math.max(9, fs * 0.28) + 'px';
+    const tm = box.querySelector('.pvtime');
+    tm.textContent = time; tm.style.fontSize = fs + 'px'; tm.style.letterSpacing = S.letterSpacing * scale + 'px';
+    const bar = box.querySelector('.pvbar');
+    bar.style.display = S.showProgress ? '' : 'none';
+    bar.style.height = Math.max(2, (Number(S.progressHeight) > 0 ? Number(S.progressHeight) : Math.max(3, S.fontSize * 0.06)) * scale) + 'px';
+    box.classList.toggle('bar-top', S.progressPosition === 'top');
+  }
+}
+
 // ---------- 提示条 ----------
 api.on('toast', (m) => {
   const el = $('#toast');
@@ -240,5 +380,9 @@ api.on('toast', (m) => {
 });
 
 // ---------- 启动 ----------
-api.on('settings', (s) => { S = s; refresh(); });
-initPlatform().then(() => api.getSettings()).then((s) => { S = s; refresh(); });
+let lastFiles = '';
+api.on('settings', (s) => { S = s; refresh(); const k = JSON.stringify(s.linkFiles); if (k !== lastFiles) { lastFiles = k; refreshFileState(); } });
+initPreview();
+api.on('link', refreshFileState);
+window.addEventListener('focus', refreshFileState);
+initPlatform().then(() => api.getSettings()).then((s) => { S = s; lastFiles = JSON.stringify(s.linkFiles); refresh(); refreshFileState(); });

@@ -85,5 +85,14 @@ function fmtDur(sec) {
 }
 const segmentsToText = (segs) => segs.map((s) => `${s.name ? s.name + ' ' : ''}${fmtDur(s.sec)}`).join('\n');
 
-window.CDParse = { parseLine, parseText, parseConfig, fmtDur, segmentsToText };
+// 解析单个时长文本(8秒 / 1分30秒 / 2:00 / 纯数字=秒),无法解析返回 null
+function parseDuration(s) {
+  s = String(s).trim();
+  if (!s) return null;
+  if (/^\d+(?:\.\d+)?$/.test(s)) { const v = Math.round(parseFloat(s)); return v > 0 ? v : null; }
+  const d = durFromText(s);
+  return d && d.sec > 0 && !clean(d.rest) ? Math.max(1, Math.round(d.sec)) : null;
+}
+
+window.CDParse = { parseDuration, parseLine, parseText, parseConfig, fmtDur, segmentsToText };
 })();
