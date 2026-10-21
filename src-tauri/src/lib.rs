@@ -40,7 +40,7 @@ fn defaults() -> Value {
         "x": null, "y": null,
         "segments": [{ "name": "", "sec": 60 }], "loop": false, "autoNext": true,
         "endText": "时间到", "beep": true, "beepVolume": 0.5, "tickBeep": false, "flashOnEnd": true,
-        "fontFamily": "", "fontFile": "", "fontSize": 72, "fontWeight": 700, "letterSpacing": 0,
+        "fontFamily": "Bahnschrift", "fontFile": "", "fontSize": 72, "fontWeight": 700, "letterSpacing": 0,
         "textColor": "#ffffff", "warnEnabled": true, "warnSec": 10, "warnColor": "#ff4d4f",
         "bgStyle": "solid", "bgColor": "#0f172a", "bgColor2": "#334155", "bgOpacity": 0.78, "windowOpacity": 1,
         "radius": 18, "borderWidth": 0, "borderColor": "#ffffff", "shadow": true, "textShadow": false, "glow": false,

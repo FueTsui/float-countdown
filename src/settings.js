@@ -6,7 +6,7 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 let S = null, P = { os: 'windows' };
 
 const PRESETS = {
-  '数码屏': { fontFamily: '', fontWeight: 700, textColor: '#ffffff', bgStyle: 'solid', bgColor: '#0f172a', bgOpacity: 0.78, radius: 18, borderWidth: 0, shadow: true, textShadow: false, glow: false, warnColor: '#ff4d4f' },
+  '数码屏': { fontFamily: 'Bahnschrift', fontWeight: 700, textColor: '#ffffff', bgStyle: 'solid', bgColor: '#0f172a', bgOpacity: 0.78, radius: 18, borderWidth: 0, shadow: true, textShadow: false, glow: false, warnColor: '#ff4d4f' },
   '极简': { bgStyle: 'none', textColor: '#ffffff', textShadow: true, shadow: false, glow: false, borderWidth: 0, fontWeight: 700, warnColor: '#ff6b6b' },
   '霓虹': { bgStyle: 'solid', bgColor: '#05050f', bgOpacity: 0.72, textColor: '#22d3ee', glow: true, radius: 14, borderWidth: 2, borderColor: '#22d3ee', fontWeight: 700, shadow: false, textShadow: false, warnColor: '#ff3b8d' },
   '浅色卡片': { bgStyle: 'solid', bgColor: '#ffffff', bgOpacity: 0.94, textColor: '#111827', radius: 24, borderWidth: 0, shadow: true, textShadow: false, glow: false, fontWeight: 700, warnColor: '#dc2626' },
@@ -46,11 +46,31 @@ async function initPlatform() {
   html.classList.toggle('material', !!(P.mica || P.os === 'macos'));
   applyTheme();
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
-  $('#fonts').innerHTML = (FONTS[P.os] || FONTS.windows).map((f) => `<option value="${f}">`).join('');
+  fillFonts();
   $('#linkUnsupported').hidden = P.linkSupported !== false;
   if (P.os === 'macos') $('#tipTray').textContent = '隐藏或穿透后,可在屏幕顶部菜单栏图标找回:左键显示/隐藏,右键菜单';
   if (P.os === 'macos') { for (const el of $$('[data-hk]')) el.placeholder = '未设置'; }
 }
+
+// 字体只能从下拉里选;旧设置里的自定义字体名也会保留为一项
+function fillFonts() {
+  const sel = $('#fontSel');
+  if (!sel) return;
+  const list = [...new Set(['Bahnschrift', ...(FONTS[P.os] || FONTS.windows)])];
+  if (S && S.fontFamily && !list.includes(S.fontFamily)) list.push(S.fontFamily);
+  sel.innerHTML = '<option value="">系统默认</option>' + list.map((f) => `<option value="${f}" style="font-family:'${f}'">${f}</option>`).join('');
+  if (S) sel.value = S.fontFamily || '';
+}
+
+// ---------- 侧栏折叠 ----------
+function setCollapsed(c) {
+  document.body.classList.toggle('collapsed', c);
+  const b = $('#btnCollapse');
+  b.setAttribute('aria-expanded', String(!c)); b.title = c ? '展开侧栏' : '折叠侧栏';
+  try { localStorage.setItem('sideCollapsed', c ? '1' : ''); } catch (e) { /* ignore */ }
+}
+$('#btnCollapse').onclick = () => setCollapsed(!document.body.classList.contains('collapsed'));
+try { if (localStorage.getItem('sideCollapsed')) setCollapsed(true); } catch (e) { /* ignore */ }
 
 // ---------- 页面切换 ----------
 function showPage(name) {
@@ -179,6 +199,7 @@ function renderFiles() {
 }
 
 function refresh() {
+  if (P && S && !$$('#fontSel option').some((o) => o.value === (S.fontFamily || ''))) fillFonts();
   for (const el of $$('[data-k]')) {
     const v = S[el.dataset.k];
     if (document.activeElement !== el) {

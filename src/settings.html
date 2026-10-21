@@ -21,6 +21,7 @@
   <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
   <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></symbol>
   <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
   <symbol id="i-up" viewBox="0 0 24 24"><path d="M6 14l6-6 6 6"/></symbol>
   <symbol id="i-down" viewBox="0 0 24 24"><path d="M6 10l6 6 6-6"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
@@ -29,23 +30,22 @@
 
 <div id="app">
   <nav id="sidebar">
-    <div class="brand" data-tauri-drag-region>
-      <img src="icon.png" alt="" width="28" height="28">
-      <div><div class="brand-name">悬浮倒计时</div><div class="brand-sub" id="brandSub">设置</div></div>
-    </div>
+    <button class="collapse" id="btnCollapse" aria-label="折叠或展开侧栏" aria-expanded="true" title="折叠侧栏">
+      <svg><use href="#i-menu"/></svg><span class="cl-text">设置</span>
+    </button>
     <ul id="nav">
-      <li data-page="timer" class="on"><svg><use href="#i-timer"/></svg><span>计时环节</span></li>
-      <li data-page="look"><svg><use href="#i-palette"/></svg><span>外观</span></li>
-      <li data-page="title"><svg><use href="#i-title"/></svg><span>标题与进度条</span></li>
-      <li data-page="slides"><svg><use href="#i-slides"/></svg><span>演示文件</span></li>
-      <li data-page="window"><svg><use href="#i-window"/></svg><span>窗口与快捷键</span></li>
-      <li data-page="about"><svg><use href="#i-info"/></svg><span>关于</span></li>
+      <li data-page="slides" class="on" title="演示文件"><svg><use href="#i-slides"/></svg><span>演示文件</span></li>
+      <li data-page="timer" title="计时环节"><svg><use href="#i-timer"/></svg><span>计时环节</span></li>
+      <li data-page="look" title="外观"><svg><use href="#i-palette"/></svg><span>外观</span></li>
+      <li data-page="title" title="标题与进度条"><svg><use href="#i-title"/></svg><span>标题与进度条</span></li>
+      <li data-page="window" title="窗口与快捷键"><svg><use href="#i-window"/></svg><span>窗口与快捷键</span></li>
+      <li data-page="about" title="关于"><svg><use href="#i-info"/></svg><span>关于</span></li>
     </ul>
   </nav>
 
   <main id="content">
     <header id="head" data-tauri-drag-region>
-      <h1 id="pageTitle" data-tauri-drag-region>计时环节</h1>
+      <h1 id="pageTitle" data-tauri-drag-region>演示文件</h1>
       <div class="transport">
         <button class="btn accent" data-cmd="toggle" title="开始 / 暂停"><svg><use href="#i-play"/></svg><span>开始 / 暂停</span></button>
         <button class="btn icon" data-cmd="reset" title="重置"><svg><use href="#i-reset"/></svg></button>
@@ -56,7 +56,7 @@
 
     <div id="pages">
     <!-- ================= 计时环节 ================= -->
-    <section class="page on" id="p-timer">
+    <section class="page" id="p-timer">
       <h2>环节列表</h2>
       <div class="group">
         <div class="row block">
@@ -106,7 +106,7 @@
 
       <h2>文字</h2>
       <div class="group">
-        <div class="row"><div class="rl"><div class="t">字体</div><div class="d">留空使用系统字体</div></div><div class="rc"><input type="text" class="w180" data-k="fontFamily" list="fonts" placeholder="系统默认"><datalist id="fonts"></datalist></div></div>
+        <div class="row"><div class="rl"><div class="t">字体</div><div class="d">默认 Bahnschrift;也可在下方选择字体文件</div></div><div class="rc"><select class="w220" data-k="fontFamily" id="fontSel" aria-label="字体"></select></div></div>
         <div class="row"><div class="rl"><div class="t">自定义字体文件</div><div class="d" id="fontName">未选择</div></div><div class="rc"><button class="btn" id="btnFont">选择 ttf / otf…</button><button class="btn" id="btnFontClear">清除</button></div></div>
         <div class="row"><div class="rl"><div class="t">字号</div></div><div class="rc"><input type="range" class="w220" data-k="fontSize" min="16" max="320" step="1"><output></output></div></div>
         <div class="row"><div class="rl"><div class="t">字重</div></div><div class="rc"><select data-k="fontWeight" data-num><option value="400">常规</option><option value="500">中等</option><option value="600">半粗</option><option value="700">粗体</option><option value="900">特粗</option></select></div></div>
@@ -154,7 +154,7 @@
     </section>
 
     <!-- ================= 演示文件 ================= -->
-    <section class="page" id="p-slides">
+    <section class="page on" id="p-slides">
       <div class="callout" id="linkUnsupported" hidden>演示联动(检测全屏放映、翻页重新计时)目前只支持 Windows。在这台电脑上可以添加文件,但不会自动联动。</div>
       <div id="dropzone" tabindex="0">
         <svg class="dz-ic"><use href="#i-upload"/></svg>

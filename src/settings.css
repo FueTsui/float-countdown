@@ -412,3 +412,19 @@ html:not(.material) .seg-ctl button.on { background: var(--ctl); }
 .pvbar { align-self: stretch; margin-top: .3em; border-radius: 99px; background: rgba(255,255,255,.18); overflow: hidden; }
 .pvbar i { display: block; height: 100%; width: 70%; background: currentColor; border-radius: 99px; }
 .pvbox.bar-top .pvbar { order: -1; margin: 0 0 .35em; }
+
+/* ---- 侧栏折叠按钮(替代原来的应用名称块) ---- */
+.collapse { display: flex; align-items: center; gap: 14px; width: 100%; height: 40px; margin: 2px 0 10px; padding: 0 14px; font: inherit; color: var(--fg); background: transparent; border: 0; border-radius: var(--radius-ctl); cursor: default; }
+.collapse:hover { background: var(--subtle-hover); }
+.collapse:active { background: var(--subtle-press); }
+.collapse svg { width: 18px; height: 18px; }
+.collapse .cl-text { font-weight: 600; }
+#app { transition: grid-template-columns .2s cubic-bezier(.1,.9,.2,1); }
+body.collapsed #app { grid-template-columns: 62px 1fr; }
+html[data-os="macos"] body.collapsed #app { grid-template-columns: 56px 1fr; }
+body.collapsed #nav li { justify-content: center; padding: 0; }
+body.collapsed #nav li span, body.collapsed .collapse .cl-text { display: none; }
+body.collapsed .collapse { justify-content: center; padding: 0; }
+body.collapsed #sidebar { padding-left: 6px; padding-right: 6px; }
+html[data-os="macos"] .collapse { height: 28px; gap: 8px; padding: 0 8px; }
+html[data-os="macos"] #sidebar { padding-top: 40px; }
